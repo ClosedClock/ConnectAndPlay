@@ -1,6 +1,6 @@
 import socket
 
-from global_vars import *
+from settings import *
 
 def connectTo(addr):
     global connectedServer

@@ -4,16 +4,13 @@ import threading
 from time import sleep
 
 from deal_command import *
-from global_vars import *
-
+import settings
 
 
 def dealCommands():
-    global commandsForProcess
-    global mode
     while True:
-        newCommand = commandsForProcess.get(True)
-        if (newCommand == 'exit' and mode == Mode.NORMAL) or (newCommand == '\\exit' and mode != Mode.NORMAL):
+        newCommand = settings.commandsForProcess.get(True)
+        if (newCommand == 'exit' and settings.mode == Mode.NORMAL) or (newCommand == '\\exit' and settings.mode != Mode.NORMAL):
             break
         try:
             CommandList.run(newCommand)
@@ -24,27 +21,24 @@ def dealCommands():
 
 
 def main():
-    print('ConnectAndPlay (author @%s) v%s started' % (AUTHOR, VERSION_NUMBER))
-    global commandsForProcess
-
-    global mode
+    print('ConnectAndPlay (author @%s) v%s started' % (settings.AUTHOR, VERSION_NUMBER))
 
     tDealCommands = threading.Thread(target=dealCommands, args=())
     tDealCommands.start()
 
     while True:
-        if not commandsForProcess.empty():
+        if not settings.commandsForProcess.empty():
             sleep(0.1)
             continue
 
-        if mode == Mode.NORMAL:
+        if settings.mode == Mode.NORMAL:
             print('>>> ', end='')
-        elif mode == Mode.SERVER:
+        elif settings.mode == Mode.SERVER:
             print('%s:> ' % name)
 
         newCommand = input()
-        commandsForProcess.put(newCommand)
-        if (newCommand == 'exit' and mode == Mode.NORMAL) or (newCommand == '\\exit' and mode != Mode.NORMAL):
+        settings.commandsForProcess.put(newCommand)
+        if (newCommand == 'exit' and settings.mode == Mode.NORMAL) or (newCommand == '\\exit' and settings.mode != Mode.NORMAL):
             break
 
     tDealCommands.join()

@@ -2,7 +2,7 @@ import re
 
 from server import *
 from client import *
-from global_vars import *
+import settings
 
 
 def guide(commandName = ''):
@@ -17,15 +17,13 @@ def guide(commandName = ''):
 
 
 def shutDownServer():
-    global connectedSocks
-    global mode
-    if mode == Mode.NORMAL:
+    if settings.mode == Mode.NORMAL:
         print('You are not connection to anyone.')
         return
-    mode = Mode.NORMAL
-    for sock in connectedSocks:
+    settings.mode = Mode.NORMAL
+    for sock in settings.connectedSocks:
         sock.close()
-    connectedSocks = []
+    settings.connectedSocks = []
 
 def stopConnection():
     pass
@@ -73,11 +71,10 @@ class CommandList(object):
 
     @staticmethod
     def run(command):
-        global mode
-        if mode == Mode.NORMAL:
+        if settings.mode == Mode.NORMAL:
             commandWords = re.split(r'\s+', command)
             CommandList.commandDict[commandWords[0]][0](*commandWords[1:])
-        elif mode == Mode.SERVER:
+        elif settings.mode == Mode.SERVER:
             if command[0] == '\\':
                 commandWords = re.split(r'\s+', command[1:])
                 CommandList.commandDict[commandWords[0]][0](*commandWords[1:])
@@ -85,7 +82,7 @@ class CommandList(object):
                 print(command)
                 for sock in connectedSocks:
                     sock.send(command.encode('utf-8'))
-        elif mode == Mode.CLIENT:
+        elif settings.mode == Mode.CLIENT:
             if command[0] == '\\':
                 commandWords = re.split(r'\s+', command[1:])
                 CommandList.commandDict[commandWords[0]][0](*commandWords[1:])

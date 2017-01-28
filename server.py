@@ -1,11 +1,12 @@
 import socket
 import threading
 
-from global_vars import *
+import settings
+from settings import Mode
 
 def waiting(s):
     sock, addr = s.accept()
-    connectedSocks.append(sock)
+    settings.connectedSocks.append(sock)
     print('Accept new connection from %s:%s...' % addr)
     sock.send(b'Welcome!')
     while True:
@@ -18,13 +19,11 @@ def waiting(s):
 
 
 def startServer():
-    global commandsForProcess
-    global mode
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind(('', 8887))
     s.listen(5)
-    mode = Mode.SERVER
+    settings.mode = Mode.SERVER
     print('Change to connecting mode...')
     pWaiting = threading.Thread(target=waiting, args=(s,))
     pWaiting.start()
