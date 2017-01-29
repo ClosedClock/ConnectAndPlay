@@ -1,19 +1,25 @@
 from queue import Queue
 from enum import Enum
 #import threading
+import logging
+logging.basicConfig(level=logging.INFO)
 
 VERSION_NUMBER = 0.1
 AUTHOR = 'Zijin Shi'
 
+PORT = 8887
+
 class Mode(Enum):
-    NORMAL = 0
-    SERVER = 1
-    CLIENT = 2
+    CLOSE = 0
+    NORMAL = 1
+    SERVER = 2
+    CLIENT = 3
 
 
 
 commandsForProcess = Queue()
-connectedSocks = []
-connectedServer = None
+tServer = None
+tClient = None
 name = 'Zijin'
+serverIP = '127.0.0.1'
 mode = Mode.NORMAL

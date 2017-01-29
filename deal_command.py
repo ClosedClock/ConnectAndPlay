@@ -1,8 +1,19 @@
 import re
 
-from server import *
-from client import *
+from server import start_server
+from client import connect_to
 import settings
+from settings import Mode, logging
+
+def exit():
+    if settings.mode == Mode.SERVER:
+        print(r'You should close your server first by typing "\close".')
+        return
+    elif settings.mode == Mode.CLIENT:
+        print(r'You should shut down the connection first by typing "\quit".')
+        return
+    logging.info('Got an exit command')
+    settings.mode = Mode.CLOSE
 
 
 def guide(commandName = ''):
@@ -16,28 +27,36 @@ def guide(commandName = ''):
         raise KeyError('Command not found.')
 
 
-def shutDownServer():
-    if settings.mode == Mode.NORMAL:
-        print('You are not connection to anyone.')
+def shut_down_server():
+    logging.info('Current connected socks:')
+    for sockName in settings.tServer.get_connected_socks().keys():
+        logging.info('%s:%s' % sockName)
+    if settings.mode != Mode.SERVER:
+        print('You are not in SERVER mode.')
         return
     settings.mode = Mode.NORMAL
-    for sock in settings.connectedSocks:
-        sock.close()
-    settings.connectedSocks = []
+    settings.tServer.close()
+    logging.info('All socks closed')
 
-def stopConnection():
+def stop_connection():
+    logging.info('Current connected server: %s:%s' % settings.tClient.get_connected_server())
+    if settings.mode != Mode.CLIENT:
+        print('You are not in CLIENT mode.')
+        return
+    settings.mode = Mode.NORMAL
+    settings.tClient.quit()
+    logging.info('Connection closed')
+
+
+
+
+def list_friend():
     pass
 
-
-
-
-def listFriend():
+def add_friend():
     pass
 
-def addFriend():
-    pass
-
-def deleteFriend():
+def delete_friend():
     pass
 
 
@@ -47,24 +66,24 @@ class CommandList(object):
                         'Show help information.'],
         'help':         [guide, 0,
                         'Show help information.'],
-        'friendlist':   [listFriend, 0,
+        'friendlist':   [list_friend, 0,
                         'Show friends list and their ips.'],
-        'addfriend':    [addFriend, 0,
+        'addfriend':    [add_friend, 0,
                         'Add a new friend and his/her ip to the list.'],
-        'deletefriend': [deleteFriend, 0,
+        'deletefriend': [delete_friend, 0,
                         'Delete a friend from the list.'],
-        'connect':      [connectTo, 0,
+        'connect':      [connect_to, 0,
                         'Connect to a friend\'s computer. Only works if that friend is acting as a server.'],
-        'waiting':      [startServer, 0,
+        'waiting':      [start_server, 0,
                         'During waiting, if someone connects you, than you can begin to play!'],
-        'exit':         [None, 0,
+        'exit':         [exit, 0,
                         'Terminate the program.']
     }
 
     connectedCommandDict = {
-        'close':         [shutDownServer, 0,
+        'close':         [shut_down_server, 0,
                          'Shut down the server.'],
-        'quit':          [stopConnection, 0,
+        'quit':          [stop_connection, 0,
                          'Stop the connetion.']
     }
     connectedCommandDict.update(commandDict)
@@ -76,18 +95,20 @@ class CommandList(object):
             CommandList.commandDict[commandWords[0]][0](*commandWords[1:])
         elif settings.mode == Mode.SERVER:
             if command[0] == '\\':
+                logging.info('This is a command in SERVER mode: %s' % command)
                 commandWords = re.split(r'\s+', command[1:])
-                CommandList.commandDict[commandWords[0]][0](*commandWords[1:])
+                CommandList.connectedCommandDict[commandWords[0]][0](*commandWords[1:])
             else:
                 print(command)
-                for sock in connectedSocks:
-                    sock.send(command.encode('utf-8'))
+                settings.tServer.say(command)
         elif settings.mode == Mode.CLIENT:
             if command[0] == '\\':
                 commandWords = re.split(r'\s+', command[1:])
-                CommandList.commandDict[commandWords[0]][0](*commandWords[1:])
+                CommandList.connectedCommandDict[commandWords[0]][0](*commandWords[1:])
             else:
                 print(command)
-                connectedServer.send(command.encode('utf-8'))
+                settings.tClient.say(command)
+        else:
+            return
 
 
