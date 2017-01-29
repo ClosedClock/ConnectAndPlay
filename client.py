@@ -3,6 +3,7 @@ import threading
 
 import settings
 from settings import Mode, logging
+from server import get_addr_name
 
 class ClientThread(threading.Thread):
     def __init__(self, host, port):
@@ -17,13 +18,15 @@ class ClientThread(threading.Thread):
     def run(self):
         self.__isRunning = True
         self.__clientSocket.connect(self.__serverAddr)
+        nickname = get_addr_name(self.__serverAddr)
+        print('Connected to %s' % nickname)
         while self.__isRunning:
             try:
                 message = self.__clientSocket.recv(1024).decode('utf-8')
                 logging.info(r'Client got message "%s"' % message)
             except socket.timeout:
                 continue
-            print('%s>: %s' % (self.__serverAddr[0], message))
+            print('%s>: %s' % (nickname, message))
 
     def quit(self):
         self.__clientSocket.send(r'\quit'.encode('utf-8'))
@@ -36,8 +39,15 @@ class ClientThread(threading.Thread):
         return self.__serverAddr
 
 
-def connect_to(addr):
-    settings.tClient = ClientThread(addr, settings.PORT)
+def connect_to(str):
+    if str in settings.friendList.values():
+        for ip, nickname in settings.friendList.items():
+            if nickname == str:
+                correspondIp = ip
+                break
+    else:
+        correspondIp = str
+    settings.tClient = ClientThread(correspondIp, settings.PORT)
     print('Change to CLIENT mode...')
     settings.mode = Mode.CLIENT
     settings.tClient.start()

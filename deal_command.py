@@ -1,4 +1,5 @@
 import re
+import json
 
 from server import start_server
 from client import connect_to
@@ -19,7 +20,11 @@ def exit():
 def guide(commandName = ''):
     if commandName == '':
         print('Here lists all available commands.')
-        for k, v in CommandList.commandDict.items():
+        items = {Mode.NORMAL: CommandList.commandDict,
+                 Mode.SERVER: CommandList.serverCommandDict,
+                 Mode.CLIENT: CommandList.clientCommandDict
+        }[settings.mode].items()
+        for k, v in items:
             print('%s:    %s' % (k, v[2]))
     elif commandName in CommandList.commandDict:
         print('%s: %s' % (commandName, CommandList.commandDict[commandName][2]))
@@ -38,6 +43,7 @@ def shut_down_server():
     settings.tServer.close()
     logging.info('All socks closed')
 
+
 def stop_connection():
     logging.info('Current connected server: %s:%s' % settings.tClient.get_connected_server())
     if settings.mode != Mode.CLIENT:
@@ -48,16 +54,58 @@ def stop_connection():
     logging.info('Connection closed')
 
 
+def save_data():
+    """Save the dict friendList to the file FriendList.txt"""
+    with open(settings.filePath, 'w') as file:
+        file.write(json.dumps([settings.username, settings.friendList]))
 
 
 def list_friend():
-    pass
+    if settings.friendList == {}:
+        print('You don\'t have any saved friend. Add friends by \"addfriend ip (nickname)\"')
+        return
+    for ip, nickname in settings.friendList.items():
+        if nickname == None:
+            print('%s: No nickname' % ip)
+        else:
+            print('%s: %s' % (ip, nickname))
 
-def add_friend():
-    pass
 
-def delete_friend():
-    pass
+def add_friend(ip, nickname=None):
+    if not re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', ip):
+        print('Invalid IPv4 format')
+        return
+    if (ip in settings.friendList) and (settings.friendList[ip] != None):
+        if (nickname == settings.friendList[ip]) or (nickname == None):
+            return
+        answer = input('IP already exists. Do you want to change the nickname from \"%s\" to \"%s\"? (y/n)' % (settings.friendList[ip], nickname))
+        #answer = input()
+        if answer == 'y' or answer == 'Y':
+            if nickname in settings.friendList.values():
+                print('Warning: nicknames repeated')
+            settings.friendList[ip] = nickname
+            save_data()
+        else:
+            return
+    else:
+        if (nickname in settings.friendList.values()) and (nickname != None):
+            print('Warning: nicknames repeated')
+        settings.friendList[ip] = nickname
+        save_data()
+
+
+def delete_friend(str):
+    if str in settings.friendList:
+        del settings.friendList[str]
+        save_data()
+        return
+    ipsOfStr = []
+    for ip, nickname in settings.friendList.items():
+        if nickname == str:
+            ipsOfStr.append(ip)
+    for ip in ipsOfStr:
+        del settings.friendList[ip]
+    save_data()
 
 
 class CommandList(object):
@@ -80,16 +128,22 @@ class CommandList(object):
                         'Terminate the program.']
     }
 
-    connectedCommandDict = {
+    serverCommandDict = {
         'close':         [shut_down_server, 0,
                          'Shut down the server.'],
+    }
+    serverCommandDict.update(commandDict)
+
+    clientCommandDict = {
         'quit':          [stop_connection, 0,
                          'Stop the connetion.']
     }
-    connectedCommandDict.update(commandDict)
+    clientCommandDict.update(commandDict)
 
     @staticmethod
     def run(command):
+        if re.match(r'^\s*$', command):
+            return
         if settings.mode == Mode.NORMAL:
             commandWords = re.split(r'\s+', command)
             CommandList.commandDict[commandWords[0]][0](*commandWords[1:])
@@ -97,16 +151,16 @@ class CommandList(object):
             if command[0] == '\\':
                 logging.info('This is a command in SERVER mode: %s' % command)
                 commandWords = re.split(r'\s+', command[1:])
-                CommandList.connectedCommandDict[commandWords[0]][0](*commandWords[1:])
+                CommandList.serverCommandDict[commandWords[0]][0](*commandWords[1:])
             else:
-                print(command)
+                #print(command)
                 settings.tServer.say(command)
         elif settings.mode == Mode.CLIENT:
             if command[0] == '\\':
                 commandWords = re.split(r'\s+', command[1:])
-                CommandList.connectedCommandDict[commandWords[0]][0](*commandWords[1:])
+                CommandList.clientCommandDict[commandWords[0]][0](*commandWords[1:])
             else:
-                print(command)
+                #print(command)
                 settings.tClient.say(command)
         else:
             return

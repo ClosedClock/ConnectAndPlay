@@ -36,8 +36,8 @@ def main():
 
         if settings.mode == Mode.NORMAL:
             print('>>> ', end='')
-        elif settings.mode == Mode.SERVER:
-            print('%s:> ' % settings.name, end='')
+        # elif settings.mode == Mode.SERVER or settings.mode == Mode.CLIENT:
+        #     print('%s:> ' % settings.username, end='')
 
         newCommand = input()
         settings.commandsForProcess.put(newCommand)
