@@ -4,12 +4,12 @@ import logging
 import json
 import os
 
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.INFO)
 
 VERSION_NUMBER = 0.1
 AUTHOR = 'Zijin Shi'
 
-PORT = 8887
+PORT = 8886
 
 class Mode(Enum):
     CLOSE = 0

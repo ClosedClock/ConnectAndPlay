@@ -17,16 +17,28 @@ class ClientThread(threading.Thread):
 
     def run(self):
         self.__isRunning = True
-        self.__clientSocket.connect(self.__serverAddr)
+        sock = self.__clientSocket
+        sock.connect(self.__serverAddr)
         nickname = get_addr_name(self.__serverAddr)
         print('Connected to %s' % nickname)
-        while self.__isRunning:
+        emptyStrCounter = 0
+        while self.__isRunning and emptyStrCounter < 50:
             try:
-                message = self.__clientSocket.recv(1024).decode('utf-8')
+                message = sock.recv(1024).decode('utf-8')
                 logging.info(r'Client got message "%s"' % message)
+                if message == '':
+                    emptyStrCounter += 1
+                    continue
+                else:
+                    emptyStrCounter = 0
             except socket.timeout:
                 continue
+            if message == r'\close':
+                break
             print('%s>: %s' % (nickname, message))
+        sock.send(br'\quit')
+        sock.close()
+        print('Connection to %s closed.' % nickname)
 
     def quit(self):
         self.__clientSocket.send(r'\quit'.encode('utf-8'))

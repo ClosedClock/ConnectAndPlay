@@ -41,6 +41,7 @@ def shut_down_server():
         return
     settings.mode = Mode.NORMAL
     settings.tServer.close()
+    settings.tServer = None
     logging.info('All socks closed')
 
 
@@ -51,6 +52,7 @@ def stop_connection():
         return
     settings.mode = Mode.NORMAL
     settings.tClient.quit()
+    settings.tClient = None
     logging.info('Connection closed')
 
 

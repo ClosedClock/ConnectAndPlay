@@ -41,16 +41,22 @@ class ServerThread(threading.Thread):
         nickname = get_addr_name(addr)
         sock = self.__connectedSocks[addr]
         print('Accept new connection from %s...' % nickname)
-        sock.send(b'Welcome!')
-        while self.__isRunning:
+        sock.send(b'Welcome')
+        emptyStrCounter = 0
+        while self.__isRunning and emptyStrCounter < 50:
             try:
-                message = sock.recv(1024)
-                logging.info(r'Server got message %s' % message.decode('utf-8'))
+                message = sock.recv(1024).decode('utf-8')
+                logging.info(r'Server got message %r' % message)
+                if message == '':
+                    emptyStrCounter += 1
+                    continue
+                else:
+                    emptyStrCounter = 0
             except socket.timeout:
                 continue
-            print('%s:> %s' % (nickname, message.decode('utf-8')))
-            if message.decode('utf-8') == r'\quit':
+            if message == r'\quit':
                 break
+            print('%s:> %s' % (nickname, message))
         sock.send(br'\close')
         sock.close()
         print('Connection from %s closed.' % nickname)
