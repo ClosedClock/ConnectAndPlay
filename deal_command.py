@@ -3,6 +3,7 @@ import json
 
 from server import start_server
 from client import connect_to
+from Janken import janken
 import settings
 from settings import Mode, logging
 
@@ -34,8 +35,8 @@ def guide(commandName = ''):
 
 def shut_down_server():
     logging.info('Current connected socks:')
-    for sockName in settings.tServer.get_connected_socks().keys():
-        logging.info('%s:%s' % sockName)
+    for addr in settings.tServer.get_clients():
+        logging.info('%s' % addr[0])
     if settings.mode != Mode.SERVER:
         print('You are not in SERVER mode.')
         return
@@ -130,17 +131,25 @@ class CommandList(object):
                         'Terminate the program.']
     }
 
+    connectCommandDict = {
+        'janken':       [janken, 0,
+                         'Play the game \"Janken\" with your friend']
+    }
+    connectCommandDict.update(commandDict)
+
+
     serverCommandDict = {
         'close':         [shut_down_server, 0,
                          'Shut down the server.'],
     }
-    serverCommandDict.update(commandDict)
+    serverCommandDict.update(connectCommandDict)
+
 
     clientCommandDict = {
         'quit':          [stop_connection, 0,
                          'Stop the connetion.']
     }
-    clientCommandDict.update(commandDict)
+    clientCommandDict.update(connectCommandDict)
 
     @staticmethod
     def run(command):

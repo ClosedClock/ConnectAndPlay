@@ -3,7 +3,6 @@ import threading
 
 import settings
 from settings import Mode, logging
-from server import get_addr_name
 
 class ClientThread(threading.Thread):
     def __init__(self, host, port):
@@ -15,11 +14,14 @@ class ClientThread(threading.Thread):
         self.__isRunning = False
         logging.info('A ServerThread object created')
 
+    def get_nickname(self):
+        return settings.get_addr_name(self.__serverAddr)
+
     def run(self):
         self.__isRunning = True
         sock = self.__clientSocket
         sock.connect(self.__serverAddr)
-        nickname = get_addr_name(self.__serverAddr)
+        nickname = self.get_nickname()
         print('Connected to %s' % nickname)
         emptyStrCounter = 0
         while self.__isRunning and emptyStrCounter < 50:
@@ -38,10 +40,11 @@ class ClientThread(threading.Thread):
             print('%s>: %s' % (nickname, message))
         sock.send(br'\quit')
         sock.close()
+        settings.mode = Mode.NORMAL
         print('Connection to %s closed.' % nickname)
 
     def quit(self):
-        self.__clientSocket.send(r'\quit'.encode('utf-8'))
+        self.__clientSocket.send(br'\quit')
         self.__isRunning = False
 
     def say(self, message):

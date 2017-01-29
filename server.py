@@ -1,21 +1,74 @@
 import socket
 import threading
+import re
+from queue import Queue
 
 import settings
 from settings import Mode, logging
 
-def get_addr_name(addr):
-    ip = addr[0]
-    if ip in settings.friendList:
-        return settings.friendList[ip]
-    else:
-        return ip
+
+
+class ServerSlaveThread(threading.Thread):
+    def __init__(self, sock, addr):
+        logging.info('Initializing a ServerSlaveThread object')
+        super().__init__()
+        self.__queue = Queue()
+        self.__addr = addr
+        self.__sock = sock
+        self.__isRunning = False
+
+    def get_nickname(self):
+        return settings.get_addr_name(self.__addr)
+
+    def run(self):
+        self.__isRunning = True
+        nickname = self.get_nickname()
+        print('Accept new connection from %s...' % nickname)
+        self.__sock.send(b'Welcome')
+        emptyStrCounter = 0
+        while self.__isRunning and emptyStrCounter < 50:
+            try:
+                message = self.__sock.recv(1024).decode('utf-8')
+                logging.info(r'Server got message %r' % message)
+                if message == '':
+                    emptyStrCounter += 1
+                    continue
+                else:
+                    emptyStrCounter = 0
+            except socket.timeout:
+                continue
+            if message == r'\quit':
+                break
+            self.deal_message(message)
+        self.__sock.send(br'\close')
+        self.__sock.close()
+        print('Connection from %s closed.' % nickname)
+
+    def deal_message(self, message):
+        if message[0] == '\\':
+            logging.info('This is a command from: %s' % self.get_nickname())
+            self.__queue.put(message)
+        else:
+            #print(command)
+            print('%s:> %s' % (self.get_nickname(), message))
+
+    def get_message(self):
+        return self.__queue.get()
+        #TODO use get(True)?
+
+    def send_message(self, message):
+        self.__sock.send(message.encode('utf-8'))
+
+    def close(self):
+        logging.info('Set the ServerSlaveThread isRunning flag to False')
+        self.__isRunning = False
+
 
 class ServerThread(threading.Thread):
     def __init__(self, host, port):
         logging.info('Initializing a ServerThread object')
         super().__init__()
-        self.__connectedSocks = {}
+        self.__clientsDict = {}
         #TODO: dict max length may be adjusted later
         self.__serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.__serverSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -32,46 +85,24 @@ class ServerThread(threading.Thread):
                 sock, addr = self.__serverSocket.accept()
             except socket.timeout:
                 continue
-            self.__connectedSocks[addr] = sock
-            tSlave = threading.Thread(target=self.server_slave, args=(addr,))
+            tSlave = ServerSlaveThread(sock, addr)
+            self.__clientsDict[addr] = tSlave
             tSlave.start()
         logging.info('tServer closed')
 
-    def server_slave(self, addr):
-        nickname = get_addr_name(addr)
-        sock = self.__connectedSocks[addr]
-        print('Accept new connection from %s...' % nickname)
-        sock.send(b'Welcome')
-        emptyStrCounter = 0
-        while self.__isRunning and emptyStrCounter < 50:
-            try:
-                message = sock.recv(1024).decode('utf-8')
-                logging.info(r'Server got message %r' % message)
-                if message == '':
-                    emptyStrCounter += 1
-                    continue
-                else:
-                    emptyStrCounter = 0
-            except socket.timeout:
-                continue
-            if message == r'\quit':
-                break
-            print('%s:> %s' % (nickname, message))
-        sock.send(br'\close')
-        sock.close()
-        print('Connection from %s closed.' % nickname)
-        del self.__connectedSocks[addr]
-
     def close(self):
-        logging.info('Set the isRunning flag to False')
+        logging.info('Set the ServerThread isRunning flag to False')
         self.__isRunning = False
+        for addr in self.__clientsDict:
+            self.__clientsDict[addr].close()
+        self.__clientsDict = {}
 
-    def get_connected_socks(self):
-        return dict(self.__connectedSocks)
+    def get_clients(self):
+        return self.__clientsDict.keys()
 
     def say(self, message):
-        for sock in self.__connectedSocks.values():
-            sock.send(message.encode('utf-8'))
+        for addr in self.__clientsDict:
+            self.__clientsDict[addr].send_message(message)
 
 def start_server():
     settings.tServer = ServerThread('', settings.PORT)

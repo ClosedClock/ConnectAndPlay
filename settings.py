@@ -17,7 +17,12 @@ class Mode(Enum):
     SERVER = 2
     CLIENT = 3
 
-
+def get_addr_name(addr):
+    ip = addr[0]
+    if ip in friendList:
+        return friendList[ip]
+    else:
+        return ip
 
 commandsForProcess = Queue()
 tServer = None
