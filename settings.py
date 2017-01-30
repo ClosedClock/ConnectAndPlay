@@ -4,9 +4,9 @@ import logging
 import json
 import os
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.ERROR)
 
-VERSION_NUMBER = 0.1
+VERSION_NUMBER = 0.2
 AUTHOR = 'Zijin Shi'
 
 PORT = 8886
@@ -25,11 +25,11 @@ def get_addr_name(addr):
     else:
         return ip
 
-def get_connect_thread(addr=''):
+def get_connect_thread(ip=None):
     if mode == Mode.SERVER:
-        return tServer.get_slave_thread(addr)
+        return tServer.get_slave_thread(ip)
     elif mode == Mode.CLIENT:
-        assert addr == '', 'Redundant parameters'
+        assert ip == None, 'Redundant parameters'
         return tClient
     else:
         return None
@@ -38,7 +38,7 @@ commandsForProcess = Queue()
 tServer = None
 tClient = None
 mode = Mode.NORMAL
-gameOpponent = ''
+gameThread = None
 
 filePath = os.path.join(os.path.abspath('.'), 'FriendList.txt')
 try:

@@ -15,9 +15,11 @@ class GameResult(Enum):
     LOSE = 1
     WIN = 2
 
-class Janken(Game):
+class Janken(object):
     def __init__(self, connectThread, totalRoundNum):
-        super().__init__(connectThread)
+        #super().__init__(connectThread)
+        self.__thread = connectThread
+        self.__nickname = connectThread.get_nickname()
         self.__totalRoundNum = totalRoundNum
         self.__currentRoundNum = 0
         self.__resultList = []
@@ -26,7 +28,7 @@ class Janken(Game):
     def whole_game(self):
         self.__currentRoundNum = 1
         while self.__currentRoundNum <= self.__totalRoundNum:
-            print('Round %d', self.__currentRoundNum)
+            print('Round %d' % self.__currentRoundNum)
             self.one_round()
             self.__currentRoundNum += 1
         self.show_result()
@@ -41,7 +43,7 @@ class Janken(Game):
             elif result == GameResult.LOSE:
                 loseNum += 1
         print('Game finished')
-        print('Win: %d, Lose: %d, Draw: %d', (winNum, loseNum, self.__totalRoundNum - winNum - loseNum))
+        print('Win: %d, Lose: %d, Draw: %d' % (winNum, loseNum, self.__totalRoundNum - winNum - loseNum))
 
 
     def one_round(self):
@@ -49,7 +51,7 @@ class Janken(Game):
         while inputStr not in ('0', '1', '2'):
             inputStr = input("Your input is not of a correct form, please enter again: ")
         myGesture = JankenGesture(int(inputStr))
-        self.__thread.send_message(('\janken ' + inputStr).encode('utf-8'))
+        self.__thread.send_message('\janken ' + inputStr)
         opponentGesture = self.get_opponent_gesture()
         result = self.round_result(myGesture, opponentGesture)
         self.__resultList.append(result)
@@ -70,6 +72,6 @@ class Janken(Game):
         resultDisplayDict = {GameResult.DRAW: ('-X-', 'Draw'),
                              GameResult.WIN: ('-->', 'You Win!'),
                              GameResult.LOSE: ('<--', 'You Lose')}
-        print('%s: %s %s %s :%s', (settings.username, gestureDisplayDict[myGesture], resultDisplayDict[result][0], gestureDisplayDict[opponentGesture], self.__opponentNickname))
+        print('%s: %s %s %s :%s' % (settings.username, gestureDisplayDict[myGesture], resultDisplayDict[result][0], gestureDisplayDict[opponentGesture], self.__nickname))
         print(resultDisplayDict[result][1])
         return result

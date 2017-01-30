@@ -48,7 +48,7 @@ def shut_down_server():
 
 
 def stop_connection():
-    logging.info('Current connected server: %s:%s' % settings.tClient.get_connected_server())
+    logging.info('Current connected server: %s:%s' % settings.tClient.get_connected_addr())
     if settings.mode != Mode.CLIENT:
         print('You are not in CLIENT mode.')
         return
@@ -133,9 +133,10 @@ def connect_to(str):
     settings.tClient.start()
 
 
-def start_game(command, addr=''):
-    connectThread = settings.get_connect_thread(addr)
-    connectThread.send_message(command)
+def start_game(command, roundNum, ip=None):
+    connectThread = settings.get_connect_thread(ip)
+    connectThread.send_message(command + ' ' + str(roundNum))
+    settings.gameThread = connectThread
     try:
         reply = connectThread.get_message(10)
     except queue.Empty:
@@ -152,13 +153,24 @@ def start_game(command, addr=''):
 
 
 
-def start_janken(addr=''):
-    connectThread = start_game(r'\janken', addr)
-    if connectThread == None:
-        return
+def start_janken(ip=None, isReceiver=False, roundNum=None):
+    if isReceiver:
+        logging.info('Receiver tring to start game janken')
+        connectThread = settings.gameThread
+    else:
+        logging.info('Challenger trying to start game janken')
+        roundNum = int(input('How many rounds do you want to play? '))
+        connectThread = start_game(r'\janken', roundNum, ip)
+        if connectThread == None:
+            settings.gameThread = None
+            return
 
-    newJanken = Janken(connectThread)
+
+    newJanken = Janken(connectThread, roundNum)
+    logging.info('janken started')
     newJanken.whole_game()
+    settings.gameThread = None
+    logging.info('janken finished')
 
 
 class CommandList(object):
@@ -205,7 +217,20 @@ class CommandList(object):
     def run(command):
         if re.match(r'^\s*$', command):
             return
-        if settings.mode == Mode.NORMAL:
+        if settings.gameThread != None:
+            logging.info('gameThread != None')
+            gameCommand = settings.gameThread.get_message()
+            logging.info('gameCommand: %s' % gameCommand)
+            gameWords = re.split(r'\s+', gameCommand[1:])
+            if command == 'y' or command == 'Y':
+                logging.info('Challenge accepted')
+                settings.gameThread.send_message('\\' + gameWords[0])
+                CommandList.connectCommandDict[gameWords[0]][0](None, True, int(gameWords[1]))
+            else:
+                logging.info('Challenge refused')
+                settings.gameThread.send_message(r'\no')
+                settings.gameThread = None
+        elif settings.mode == Mode.NORMAL:
             commandWords = re.split(r'\s+', command)
             CommandList.commandDict[commandWords[0]][0](*commandWords[1:])
         elif settings.mode == Mode.SERVER:

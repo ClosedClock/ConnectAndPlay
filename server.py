@@ -1,74 +1,26 @@
 import socket
 import threading
-from queue import Queue
 
 import settings
 from settings import Mode, logging
+from connect_thread import ConnectThread
 
 
-
-class ServerSlaveThread(threading.Thread):
+class ServerSlaveThread(ConnectThread):
     def __init__(self, sock, addr):
         logging.info('Initializing a ServerSlaveThread object')
-        super().__init__()
-        self.__queue = Queue()
-        self.__addr = addr
-        self.__sock = sock
-        self.__isRunning = False
-
-    def get_nickname(self):
-        return settings.get_addr_name(self.__addr)
+        super().__init__(sock, addr)
+        logging.info('A ServerSlaveThread object created')
 
     def run(self):
-        self.__isRunning = True
-        sock = self.__sock
-        nickname = self.get_nickname()
-        print('Accept new connection from %s...' % nickname)
-        sock.send(b'Welcome')
-        emptyStrCounter = 0
-        while self.__isRunning and emptyStrCounter < 50:
-            try:
-                message = sock.recv(1024).decode('utf-8')
-                logging.info(r'Server got message %r' % message)
-                if message == '':
-                    emptyStrCounter += 1
-                    continue
-                else:
-                    emptyStrCounter = 0
-            except socket.timeout:
-                continue
-            if message == r'\quit':
-                break
-            self.deal_message(message)
-        sock.send(br'\quit')
-        sock.close()
-        print('Connection from %s closed.' % nickname)
+        self.send_message('Welcome')
+        print('Accept new connection from %s...' % self.get_nickname())
+        super().run()
+        print('Connection from %s closed.' % self.get_nickname())
 
-    def deal_message(self, message):
-        if message[0] == '\\':
-            logging.info('This is a command from: %s' % self.get_nickname())
-            if settings.gameOpponent != '':
-                self.__queue.put(message)
-            else:
-                if message == r'\janken':
-                    print('Received a game request %s from %s' % (message, self.get_nickname()))
-                    settings.gameOpponent = self.__addr
-                else:
-                    print('Received strange command: %s' % message)
-
-        else:
-            #print(command)
-            print('%s:> %s' % (self.get_nickname(), message))
-
-    def get_message(self, timeout=None):
-        return self.__queue.get(True, timeout)
-
-    def send_message(self, message):
-        self.__sock.send(message.encode('utf-8'))
-
-    def close(self):
+    def quit(self):
         logging.info('Set the ServerSlaveThread isRunning flag to False')
-        self.__isRunning = False
+        super().quit()
 
 
 class ServerThread(threading.Thread):
@@ -101,26 +53,27 @@ class ServerThread(threading.Thread):
         logging.info('Set the ServerThread isRunning flag to False')
         self.__isRunning = False
         for addr in self.__clientsDict:
-            self.__clientsDict[addr].close()
+            self.__clientsDict[addr].quit()
         self.__clientsDict = {}
 
     def get_clients_addr(self):
         return self.__clientsDict.keys()
 
-    def get_slave_thread(self, addr=''):
+    def get_slave_thread(self, ip=None):
         if len(self.__clientsDict) == 0:
             raise KeyError('No connection')
 
-        if addr == '':
+        if ip == None:
             if len(self.__clientsDict) == 1:
-                return self.__clientsDict.values()[0]
+                for k in self.__clientsDict:
+                    return self.__clientsDict[k]
             else:
                 raise KeyError('Address needed')
         else:
-            try:
-                return self.__clientsDict[addr]
-            except KeyError:
-                raise KeyError('Address not in clientDict when get_slave_thread')
+            for addr in self.__clientsDict:
+                if addr[0] == ip:
+                    return self.__clientsDict[addr]
+            raise KeyError('Address not in clientDict when get_slave_thread')
 
     # def get_message(self, addr):
     #     try:

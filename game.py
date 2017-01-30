@@ -1,6 +1,4 @@
 
-import settings
-from settings import Mode
 
 class Game(object):
     def __init__(self, connectThread):

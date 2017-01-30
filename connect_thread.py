@@ -1,12 +1,13 @@
 import socket
 import threading
+import re
 from queue import Queue
 
 import settings
 from settings import Mode, logging
 
 class ConnectThread(threading.Thread):
-    def __init__(self, addr, sock):
+    def __init__(self, sock, addr):
         super().__init__()
         self.__queue = Queue()
         self.__addr = addr
@@ -37,13 +38,22 @@ class ConnectThread(threading.Thread):
             self.deal_message(message)
         sock.send(br'\quit')
         sock.close()
-        settings.mode = Mode.NORMAL
-        print('Connection to %s closed.' % nickname)
 
     def deal_message(self, message):
         if message[0] == '\\':
             logging.info('This is a command from: %s' % self.get_nickname())
-            self.__queue.put(message)
+            messageWords = re.split(r'\s+', message)
+            if settings.gameThread != None:
+                self.__queue.put(message)
+                logging.info('put %s into the queue' % message)
+            else:
+                if messageWords[0] == r'\janken':
+                    print('Received a game request %s (%s rounds) from %s. Accept (y/n)?' % (message, messageWords[1], self.get_nickname()))
+                    settings.gameThread = self
+                    self.__queue.put(message)
+                else:
+                    print('Received strange command: %s' % message)
+
         else:
             #print(command)
             print('%s:> %s' % (self.get_nickname(), message))
@@ -57,11 +67,10 @@ class ConnectThread(threading.Thread):
 
 
     def quit(self):
-        logging.info('Set the ClientThread isRunning flag to False')
         self.__isRunning = False
 
 
-    def get_connected_server(self):
+    def get_connected_addr(self):
         return self.__addr
 
 
