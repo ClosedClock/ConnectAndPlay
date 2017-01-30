@@ -5,17 +5,13 @@ from queue import Queue
 import settings
 from settings import Mode, logging
 
-class ClientThread(threading.Thread):
-    def __init__(self, addr):
-        logging.info('Initializing a ServerThread object')
+class ConnectThread(threading.Thread):
+    def __init__(self, addr, sock):
         super().__init__()
         self.__queue = Queue()
         self.__addr = addr
-        self.__sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.__sock.settimeout(0.3)
-        self.__sock.connect(self.__addr)
+        self.__sock = sock
         self.__isRunning = False
-        logging.info('A ServerThread object created')
 
     def get_nickname(self):
         return settings.get_addr_name(self.__addr)
@@ -24,12 +20,11 @@ class ClientThread(threading.Thread):
         self.__isRunning = True
         sock = self.__sock
         nickname = self.get_nickname()
-        print('Connected to %s' % nickname)
         emptyStrCounter = 0
         while self.__isRunning and emptyStrCounter < 50:
             try:
                 message = sock.recv(1024).decode('utf-8')
-                logging.info(r'Client got message "%s"' % message)
+                logging.info(r'Got message "%s"' % message)
                 if message == '':
                     emptyStrCounter += 1
                     continue
@@ -37,7 +32,7 @@ class ClientThread(threading.Thread):
                     emptyStrCounter = 0
             except socket.timeout:
                 continue
-            if message == r'\close':
+            if message == r'\quit':
                 break
             self.deal_message(message)
         sock.send(br'\quit')

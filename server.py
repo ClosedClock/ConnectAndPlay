@@ -1,6 +1,5 @@
 import socket
 import threading
-import re
 from queue import Queue
 
 import settings
@@ -22,13 +21,14 @@ class ServerSlaveThread(threading.Thread):
 
     def run(self):
         self.__isRunning = True
+        sock = self.__sock
         nickname = self.get_nickname()
         print('Accept new connection from %s...' % nickname)
-        self.__sock.send(b'Welcome')
+        sock.send(b'Welcome')
         emptyStrCounter = 0
         while self.__isRunning and emptyStrCounter < 50:
             try:
-                message = self.__sock.recv(1024).decode('utf-8')
+                message = sock.recv(1024).decode('utf-8')
                 logging.info(r'Server got message %r' % message)
                 if message == '':
                     emptyStrCounter += 1
@@ -40,21 +40,28 @@ class ServerSlaveThread(threading.Thread):
             if message == r'\quit':
                 break
             self.deal_message(message)
-        self.__sock.send(br'\close')
-        self.__sock.close()
+        sock.send(br'\quit')
+        sock.close()
         print('Connection from %s closed.' % nickname)
 
     def deal_message(self, message):
         if message[0] == '\\':
             logging.info('This is a command from: %s' % self.get_nickname())
-            self.__queue.put(message)
+            if settings.gameOpponent != '':
+                self.__queue.put(message)
+            else:
+                if message == r'\janken':
+                    print('Received a game request %s from %s' % (message, self.get_nickname()))
+                    settings.gameOpponent = self.__addr
+                else:
+                    print('Received strange command: %s' % message)
+
         else:
             #print(command)
             print('%s:> %s' % (self.get_nickname(), message))
 
-    def get_message(self):
-        return self.__queue.get()
-        #TODO use get(True)?
+    def get_message(self, timeout=None):
+        return self.__queue.get(True, timeout)
 
     def send_message(self, message):
         self.__sock.send(message.encode('utf-8'))
@@ -97,15 +104,39 @@ class ServerThread(threading.Thread):
             self.__clientsDict[addr].close()
         self.__clientsDict = {}
 
-    def get_clients(self):
+    def get_clients_addr(self):
         return self.__clientsDict.keys()
+
+    def get_slave_thread(self, addr=''):
+        if len(self.__clientsDict) == 0:
+            raise KeyError('No connection')
+
+        if addr == '':
+            if len(self.__clientsDict) == 1:
+                return self.__clientsDict.values()[0]
+            else:
+                raise KeyError('Address needed')
+        else:
+            try:
+                return self.__clientsDict[addr]
+            except KeyError:
+                raise KeyError('Address not in clientDict when get_slave_thread')
+
+    # def get_message(self, addr):
+    #     try:
+    #         self.__clientsDict[addr].get_message()
+    #     except KeyError as e:
+    #         raise KeyError('Address not in clientDict when get_message')
+
+    # def send_message(self, addr, message):
+    #     try:
+    #         self.__clientsDict[addr].send_message(message)
+    #     except KeyError as e:
+    #         raise KeyError('Address not in clientDict when get_message')
 
     def say(self, message):
         for addr in self.__clientsDict:
             self.__clientsDict[addr].send_message(message)
 
-def start_server():
-    settings.tServer = ServerThread('', settings.PORT)
-    print('Change to SERVER mode...')
-    settings.mode = Mode.SERVER
-    settings.tServer.start()
+    # def get_clients_num(self):
+    #     return len(self.__clientsDict)

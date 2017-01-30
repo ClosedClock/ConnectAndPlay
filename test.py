@@ -1,9 +1,11 @@
-print('IP already exists. Do you want to change the nickname from ')
-    answer = input()
-    if answer == 'y' or answer == 'Y':
-        if nickname in settings.friendList.values():
-            print('Warning: nicknames repeated')
-        settings.friendList[ip] = nickname
-        save_data()
-    else:
-        return
+from enum import Enum
+
+
+class JankenGesture(Enum):
+    ROCK = 0
+    SCISSORS = 1
+    PAPER = 2
+
+
+a = JankenGesture(0)
+print(a == JankenGesture.ROCK)

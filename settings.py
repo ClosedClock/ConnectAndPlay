@@ -16,6 +16,7 @@ class Mode(Enum):
     NORMAL = 1
     SERVER = 2
     CLIENT = 3
+    GAME = 4
 
 def get_addr_name(addr):
     ip = addr[0]
@@ -24,10 +25,20 @@ def get_addr_name(addr):
     else:
         return ip
 
+def get_connect_thread(addr=''):
+    if mode == Mode.SERVER:
+        return tServer.get_slave_thread(addr)
+    elif mode == Mode.CLIENT:
+        assert addr == '', 'Redundant parameters'
+        return tClient
+    else:
+        return None
+
 commandsForProcess = Queue()
 tServer = None
 tClient = None
 mode = Mode.NORMAL
+gameOpponent = ''
 
 filePath = os.path.join(os.path.abspath('.'), 'FriendList.txt')
 try:

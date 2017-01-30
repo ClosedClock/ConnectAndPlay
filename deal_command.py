@@ -1,9 +1,10 @@
 import re
 import json
+import queue
 
-from server import start_server
-from client import connect_to
-from Janken import janken
+from server import ServerThread
+from client import ClientThread
+from janken import Janken
 import settings
 from settings import Mode, logging
 
@@ -35,7 +36,7 @@ def guide(commandName = ''):
 
 def shut_down_server():
     logging.info('Current connected socks:')
-    for addr in settings.tServer.get_clients():
+    for addr in settings.tServer.get_clients_addr():
         logging.info('%s' % addr[0])
     if settings.mode != Mode.SERVER:
         print('You are not in SERVER mode.')
@@ -111,6 +112,55 @@ def delete_friend(str):
     save_data()
 
 
+def start_server():
+    settings.tServer = ServerThread('', settings.PORT)
+    print('Change to SERVER mode...')
+    settings.mode = Mode.SERVER
+    settings.tServer.start()
+
+
+def connect_to(str):
+    if str in settings.friendList.values():
+        for ip, nickname in settings.friendList.items():
+            if nickname == str:
+                correspondIp = ip
+                break
+    else:
+        correspondIp = str
+    settings.tClient = ClientThread((correspondIp, settings.PORT))
+    print('Change to CLIENT mode...')
+    settings.mode = Mode.CLIENT
+    settings.tClient.start()
+
+
+def start_game(command, addr=''):
+    connectThread = settings.get_connect_thread(addr)
+    connectThread.send_message(command)
+    try:
+        reply = connectThread.get_message(10)
+    except queue.Empty:
+        reply = None
+        print('No response')
+        return None
+    if reply == command:
+        print('Requist accepted. Game start!')
+        return connectThread
+    else:
+        print('Requist refused')
+        return None
+
+
+
+
+def start_janken(addr=''):
+    connectThread = start_game(r'\janken', addr)
+    if connectThread == None:
+        return
+
+    newJanken = Janken(connectThread)
+    newJanken.whole_game()
+
+
 class CommandList(object):
     commandDict = {
         '?':            [guide, 0,
@@ -132,7 +182,7 @@ class CommandList(object):
     }
 
     connectCommandDict = {
-        'janken':       [janken, 0,
+        'janken':       [start_janken, 0,
                          'Play the game \"Janken\" with your friend']
     }
     connectCommandDict.update(commandDict)
@@ -172,7 +222,7 @@ class CommandList(object):
                 CommandList.clientCommandDict[commandWords[0]][0](*commandWords[1:])
             else:
                 #print(command)
-                settings.tClient.say(command)
+                settings.tClient.send_message(command)
         else:
             return
 
