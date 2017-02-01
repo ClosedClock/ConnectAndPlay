@@ -89,3 +89,8 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+
+
+# Strange file, added by me
+.idea/workspace.xml
