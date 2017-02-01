@@ -6,10 +6,10 @@ import os
 
 logging.basicConfig(level=logging.ERROR)
 
-VERSION_NUMBER = 0.2
+VERSION_NUMBER = 0.3
 AUTHOR = 'Zijin Shi'
 
-PORT = 8886
+PORT = 8885
 
 class Mode(Enum):
     CLOSE = 0

@@ -1,7 +1,7 @@
 from enum import Enum
 import re
+import logging
 
-import settings
 from game import Game
 
 
@@ -15,17 +15,26 @@ class GameResult(Enum):
     LOSE = 1
     WIN = 2
 
-class Janken(object):
-    def __init__(self, connectThread, totalRoundNum):
-        #super().__init__(connectThread)
-        self.__thread = connectThread
-        self.__nickname = connectThread.get_nickname()
-        self.__totalRoundNum = totalRoundNum
+
+class Janken(Game):
+    def __init__(self, isChallenger, *args):
+        super().__init__(isChallenger, *args)
+        if isChallenger:
+            logging.info('Challenger trying to start game janken')
+            roundNum = input('How many rounds do you want to play? ')
+            self.invite(' '.join((r'\janken', roundNum)))
+        else:
+            roundNum = args[0]
+        if not self.isRunning():
+            return
+
+        self.__totalRoundNum = int(roundNum)
         self.__currentRoundNum = 0
         self.__resultList = []
 
-
-    def whole_game(self):
+    def play(self):
+        if not self.isRunning():
+            return
         self.__currentRoundNum = 1
         while self.__currentRoundNum <= self.__totalRoundNum:
             print('Round %d' % self.__currentRoundNum)
@@ -51,14 +60,14 @@ class Janken(object):
         while inputStr not in ('0', '1', '2'):
             inputStr = input("Your input is not of a correct form, please enter again: ")
         myGesture = JankenGesture(int(inputStr))
-        self.__thread.send_message('\janken ' + inputStr)
+        self.send_message('\janken ' + inputStr)
         opponentGesture = self.get_opponent_gesture()
         result = self.round_result(myGesture, opponentGesture)
         self.__resultList.append(result)
 
 
     def get_opponent_gesture(self):
-        message = self.__thread.get_message()
+        message = self.get_message()
         messageWords = re.split(r'\s', message)
         assert messageWords[0] == r'\janken', 'Recevied message with incorrect format in janken'
         return JankenGesture(int(messageWords[1]))
@@ -72,6 +81,6 @@ class Janken(object):
         resultDisplayDict = {GameResult.DRAW: ('-X-', 'Draw'),
                              GameResult.WIN: ('-->', 'You Win!'),
                              GameResult.LOSE: ('<--', 'You Lose')}
-        print('%s: %s %s %s :%s' % (settings.username, gestureDisplayDict[myGesture], resultDisplayDict[result][0], gestureDisplayDict[opponentGesture], self.__nickname))
+        print('%s: %s %s %s :%s' % (self.username(), gestureDisplayDict[myGesture], resultDisplayDict[result][0], gestureDisplayDict[opponentGesture], self.nickname()))
         print(resultDisplayDict[result][1])
         return result
