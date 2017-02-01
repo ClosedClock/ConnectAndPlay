@@ -1,48 +1,17 @@
 import socket
 import tkinter as tk
-from idlelib.WidgetRedirector import WidgetRedirector
 from queue import Queue
 import threading
-import re
+import logging
 
 import settings
-from settings import Mode, logging
-from connect_thread import ConnectThread
-from connect_thread import ConnectGUI
-
-
-class ReadOnlyText(tk.Text):
-    def __init__(self, *args, **kwargs):
-        tk.Text.__init__(self, *args, **kwargs)
-        self.redirector = WidgetRedirector(self)
-        self.insert = self.redirector.register("insert", lambda *args, **kw: "break")
-        self.delete = self.redirector.register("delete", lambda *args, **kw: "break")
-
-
-class ClientThread(ConnectThread):
-    def __init__(self, addr):
-        logging.info('Initializing a ServerThread object')
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(0.3)
-        sock.connect(addr)
-        super().__init__(sock, addr)
-        logging.info('A ServerThread object created')
-
-    def run(self):
-        print('Connected to %s' % self.get_nickname())
-        super().run()
-        settings.mode = Mode.NORMAL
-        print('Connection to %s closed.' % self.get_nickname())
-
-    def quit(self):
-        logging.info('Set the ClientThread isRunning flag to False')
-        super().quit()
+from connect_GUI import ConnectGUI
 
 
 class ClientGUI(ConnectGUI):
     def __init__(self, addr):
+        logging.info('Initializing a ClientGUI object')
         super().__init__()
-        logging.info('Created root for ClientGUI')
         self.__sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.__sock.settimeout(0.3)
         self.__sock.connect(addr)
@@ -53,7 +22,7 @@ class ClientGUI(ConnectGUI):
 
         self.__clientThread = threading.Thread(target=self.receive_message)
         self.__clientThread.start()
-
+        logging.info('A ClientGUI object created')
 
     def receive_message(self):
         emptyStrCounter = 0
@@ -118,14 +87,14 @@ class ClientGUI(ConnectGUI):
             self.chatPanel.insert(tk.END, 'Chat room closed.\n')
             return
         message = self.messageInput.get()
-        self.messageInput.delete(0,tk.END)
+        self.messageInput.delete(0, tk.END)
         if message != '':
             self.chatPanel.insert(tk.END, settings.username + ':> ' + message + '\n')
             self.__sock.send(message.encode('utf-8'))
 
-
     def quit(self):
         if self.__isConnecting:
-            self.__sock.send(r'\quit'.encode('utf-8'))
+            self.__sock.send(br'\quit')
+            logging.info('Set the ClientGUI isConnecting flag to False')
             self.__isConnecting = False
         super().quit()

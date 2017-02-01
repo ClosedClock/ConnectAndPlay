@@ -1,14 +1,11 @@
 import re
 import json
 
-from server import ServerThread
 from client import ClientGUI
 from server import ServerGUI
 from janken import Janken
 import settings
 from settings import Mode, logging
-
-import tkinter as tk
 
 def exit():
     if settings.mode == Mode.SERVER:
