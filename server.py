@@ -51,6 +51,12 @@ class ServerSlaveThread(threading.Thread):
 
 
 class ServerGUI(ConnectGUI):
+    '''
+    创建聊天室时ServerGUI被创建
+    左上是聊天界面
+    右上是在线列表, 点击列表应该可以发起对战, 单独点击菜单里的游戏应该弹出选择对手的窗口, 可以选择AI
+    下方是发送框和发送按钮
+    '''
     def __init__(self, host, port):
         logging.info('Initializing a ServerGUI object')
         super().__init__()
@@ -68,6 +74,11 @@ class ServerGUI(ConnectGUI):
         logging.info('A ServerGUI object created')
 
     def waiting(self):
+        '''
+        监听连接, 为每个连接创建一个thread
+        通过设置isRunning到false来关闭
+        :return:
+        '''
         while self.isRunning():
             try:
                 sock, addr = self.__sock.accept()
@@ -82,6 +93,11 @@ class ServerGUI(ConnectGUI):
 
 
     def check_message(self):
+        '''
+        检查每个slave thread有没有收到消息, 处理消息(如果很耗时比如游戏就应该再建立一个线程)
+        检查完后将自己加入到100ms后的mainloop里
+        :return:
+        '''
         for addr, clientThread in self.__clientsDict.items():
             while clientThread.has_message():
                 message = clientThread.get_message()
@@ -90,6 +106,12 @@ class ServerGUI(ConnectGUI):
         self.after(100, self.check_message)
 
     def deal_message(self, addr, message):
+        '''
+        处理消息, 根据addr的不同会有不同的处理
+        :param addr: 消息发送方的地址
+        :param message: 消息
+        :return:
+        '''
         if message[0] == '\\':
             logging.info('This is a command from: %s' % settings.get_addr_name(addr))
             if message == r'\quit':
@@ -108,7 +130,8 @@ class ServerGUI(ConnectGUI):
             #     logging.info('put %s into the queue' % message)
             # else:
             #     if messageWords[0] == r'\janken':
-            #         print('Received a game request %s (%s rounds) from %s. Accept (y/n)?' % (message, messageWords[1], self.get_nickname()))
+            #         print('Received a game request %s (%s rounds) from %s. Accept (y/n)?'
+            # % (message, messageWords[1], self.get_nickname()))
             #         settings.gameThread = self
             #         self.__queue.put(message)
             #     elif messageWords[0] == r'\gameover':
@@ -123,6 +146,10 @@ class ServerGUI(ConnectGUI):
 
 
     def say(self):
+        '''
+        从输入框读取消息然后发送到全体成员
+        :return:
+        '''
         message = self.messageInput.get()
         self.messageInput.delete(0,tk.END)
         if message != '':
@@ -132,6 +159,10 @@ class ServerGUI(ConnectGUI):
                 self.__clientsDict[addr].send_message(message)
 
     def quit(self):
+        '''
+        重载了关闭按钮的函数, 会发送给所有client退出命令
+        :return:
+        '''
         for clientThread in self.__clientsDict.values():
             clientThread.send_message(r'\quit')
             clientThread.quit()

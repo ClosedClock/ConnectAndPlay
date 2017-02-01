@@ -69,7 +69,8 @@ class ClientGUI(ConnectGUI):
             #     logging.info('put %s into the queue' % message)
             # else:
             #     if messageWords[0] == r'\janken':
-            #         print('Received a game request %s (%s rounds) from %s. Accept (y/n)?' % (message, messageWords[1], self.get_nickname()))
+            #         print('Received a game request %s (%s rounds) from %s. Accept (y/n)?'
+            # % (message, messageWords[1], self.get_nickname()))
             #         settings.gameThread = self
             #         self.__queue.put(message)
             #     elif messageWords[0] == r'\gameover':
@@ -83,6 +84,10 @@ class ClientGUI(ConnectGUI):
             self.chatPanel.insert(tk.END, nickname + ':> ' + message + '\n')
 
     def say(self):
+        '''
+        目前发给服务器后就结束了, 以后需要用服务器广播到所有client
+        :return:
+        '''
         if not self.__isConnecting:
             self.chatPanel.insert(tk.END, 'Chat room closed.\n')
             return
