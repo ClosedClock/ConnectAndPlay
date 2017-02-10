@@ -25,7 +25,7 @@ class Board(Frame):
         # subThread = threading.Thread(target=self.counting)
         # subThread.start()
         app = Subboard()
-        print('created')
+        print('Im here')
         # 设置窗口标题:
         # app.master.title('subboard')
         # 主消息循环:
