@@ -121,6 +121,7 @@ def start_server():
 
 
 def connect_to(str):
+    # TODO: 改成application.py里的代码
     if str in settings.friendList.values():
         for ip, nickname in settings.friendList.items():
             if nickname == str:

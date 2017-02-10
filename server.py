@@ -57,17 +57,18 @@ class ServerGUI(ConnectGUI):
     右上是在线列表, 点击列表应该可以发起对战, 单独点击菜单里的游戏应该弹出选择对手的窗口, 可以选择AI
     下方是发送框和发送按钮
     '''
-    def __init__(self, host, port):
+    def __init__(self, master, sock):
         logging.info('Initializing a ServerGUI object')
-        super().__init__()
+        super().__init__(master)
 
         self.__clientsDict = {}
         #TODO: dict max length may be adjusted later
-        self.__sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.__sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.__sock.settimeout(0.3)
-        self.__sock.bind((host, port))
-        self.__sock.listen(5)
+        self.__sock = sock
+        # self.__sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # self.__sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # self.__sock.settimeout(0.3)
+        # self.__sock.bind((host, port))
+        # self.__sock.listen(5)
 
         self.__serverThread = threading.Thread(target=self.waiting)
         self.__serverThread.start()
@@ -98,11 +99,16 @@ class ServerGUI(ConnectGUI):
         检查完后将自己加入到100ms后的mainloop里
         :return:
         '''
+        quitClientsList = []
         for addr, clientThread in self.__clientsDict.items():
             while clientThread.has_message():
                 message = clientThread.get_message()
                 logging.info('Got message from %s: %s' % (addr, message))
-                self.deal_message(addr, message)
+                clientIsGone = self.deal_message(addr, message)
+                if clientIsGone:
+                    quitClientsList.append(addr)
+        for addr in quitClientsList:
+            del self.__clientsDict[addr]
         self.after(100, self.check_message)
 
     def deal_message(self, addr, message):
@@ -118,7 +124,7 @@ class ServerGUI(ConnectGUI):
                 nickname = settings.get_addr_name(addr)
                 self.chatPanel.insert(tk.END, nickname + ' left chat room\n')
                 self.__clientsDict[addr].quit()
-                del self.__clientsDict[addr]
+                return True
             # messageWords = re.split(r'\s+', message)
             # if settings.gameThread != None:
             #     if message == r'\gameover':
@@ -143,6 +149,8 @@ class ServerGUI(ConnectGUI):
         else:
             nickname = settings.get_addr_name(addr)
             self.chatPanel.insert(tk.END, nickname + ':> ' + message + '\n')
+
+        return False
 
 
     def say(self):

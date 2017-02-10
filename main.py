@@ -1,10 +1,10 @@
 
-
+from application import Application
 from deal_command import CommandList
 import settings
 from settings import Mode, logging
 
-
+# 没有用了
 def deal_commands():
     while settings.mode != Mode.CLOSE:
         newCommand = settings.commandsForProcess.get(True)
@@ -19,7 +19,7 @@ def deal_commands():
             print('Unknown command! Input \"help\" to list all commands.')
     logging.info('Cycle finshed')
 
-
+# main函数已经被废弃
 def main():
     print('ConnectAndPlay (author @%s) v%s started' % (settings.AUTHOR, settings.VERSION_NUMBER))
 
@@ -62,4 +62,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    root = Application()
+    root.title('Connect And Play!')
+    root.mainloop()

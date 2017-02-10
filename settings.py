@@ -6,10 +6,10 @@ import os
 
 logging.basicConfig(level=logging.ERROR)
 
-VERSION_NUMBER = 0.3
+VERSION_NUMBER = 0.4
 AUTHOR = 'Zijin Shi'
 
-PORT = 8885
+PORT = 8800
 
 class Mode(Enum):
     CLOSE = 0
@@ -41,9 +41,11 @@ mode = Mode.NORMAL
 gameThread = None
 
 filePath = os.path.join(os.path.abspath('.'), 'FriendList.txt')
+
+# TODO: 此处我感觉好像没有问题, 但是有机会最好检查一下
 try:
-    file = open(filePath, 'r')
-    jsonStr = file.read()
+    with open(filePath, 'r') as file:
+        jsonStr = file.read()
     savedData = json.loads(jsonStr)
     username = savedData[0]
     friendList = savedData[1]
@@ -53,6 +55,4 @@ except (IOError, json.decoder.JSONDecodeError):
     friendList = {}
     with open(filePath, 'w') as newFile:
         newFile.write(json.dumps([username, {}]))
-finally:
-    file.close()
 

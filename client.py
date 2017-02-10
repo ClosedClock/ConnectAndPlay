@@ -9,12 +9,13 @@ from connect_GUI import ConnectGUI
 
 
 class ClientGUI(ConnectGUI):
-    def __init__(self, addr):
+    def __init__(self, master, sock, addr):
         logging.info('Initializing a ClientGUI object')
-        super().__init__()
-        self.__sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.__sock.settimeout(0.3)
-        self.__sock.connect(addr)
+        super().__init__(master)
+        # self.__sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # self.__sock.settimeout(0.3)
+        # self.__sock.connect(addr)
+        self.__sock = sock
         self.__queue = Queue()
         self.__serverAddr = addr
 

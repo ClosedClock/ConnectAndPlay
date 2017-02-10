@@ -4,9 +4,9 @@ import logging
 
 
 
-class ConnectGUI(tk.Tk):
-    def __init__(self):
-        super().__init__()
+class ConnectGUI(tk.Toplevel):
+    def __init__(self, master):
+        super().__init__(master)
         logging.info('Created root for ClientGUI')
         self.protocol('WM_DELETE_WINDOW', self.quit)
         self.__isRunning = True
@@ -37,6 +37,7 @@ class ConnectGUI(tk.Tk):
     def quit(self):
         logging.info('Set the isRunning flag to False')
         self.__isRunning = False
+        self.master.isInChatroom = False
         self.destroy()
 
 
