@@ -94,3 +94,4 @@ ENV/
 
 # Strange file, added by me
 .idea/workspace.xml
+.DS_Store
