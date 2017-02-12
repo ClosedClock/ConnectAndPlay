@@ -95,3 +95,5 @@ ENV/
 # Strange file, added by me
 .idea
 .DS_Store
+FriendList.txt
+test.py
