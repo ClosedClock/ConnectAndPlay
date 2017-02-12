@@ -2,7 +2,7 @@ import tkinter as tk
 from enum import Enum
 
 WINDOW_SIZE = 500
-BOARD_SIZE = 10
+BOARD_SIZE = 20
 STEP = WINDOW_SIZE // BOARD_SIZE
 HINT_RADIUS = int(STEP // 3)
 SIDE_WIDTH = WINDOW_SIZE / 5
@@ -20,9 +20,17 @@ currentPlayer = BoardStatus.BLACK
 root = tk.Tk()
 myCanvas = tk.Canvas(root, width=WINDOW_SIZE + SIDE_WIDTH, height=WINDOW_SIZE, background='linen')
 myCanvas.pack()
-for i in range(1, BOARD_SIZE):
-    myCanvas.create_line(i * STEP, 0, i * STEP, WINDOW_SIZE, fill='black')
-    myCanvas.create_line(0, i * STEP, WINDOW_SIZE, i * STEP, fill='black')
+
+def create_circle(centerX, centerY, radius, **kw):
+    return myCanvas.create_oval(centerX - radius, centerY - radius, centerX + radius, centerY + radius, kw)
+
+def draw_board():
+    for i in range(1, BOARD_SIZE):
+        myCanvas.create_line(i * STEP, STEP, i * STEP, WINDOW_SIZE - STEP, fill='black')
+        myCanvas.create_line(STEP, i * STEP, WINDOW_SIZE - STEP, i * STEP, fill='black')
+    create_circle(WINDOW_SIZE/2, WINDOW_SIZE/2, 0.1 * STEP, fill='black')
+
+
 
 def get_center_coords():
     centerX, centerY = myCanvas.coords(myCanvas.find_withtag(tk.CURRENT))[0:2]
@@ -42,16 +50,14 @@ def add_piece(event):
     if board[index_x][index_y] != BoardStatus.BLACK and board[index_x][index_y] != BoardStatus.WHITE:
         board[index_x][index_y] = currentPlayer
         color = {BoardStatus.BLACK: 'black', BoardStatus.WHITE: 'white'}[currentPlayer]
-        myCanvas.create_oval((index_x - 0.5) * STEP, (index_y - 0.5) * STEP, (index_x + 0.5) * STEP, (index_y + 0.5) * STEP,
-                             fill=color)
+        create_circle(index_x * STEP, index_y * STEP, 0.5 * STEP, fill=color)
         if currentPlayer == BoardStatus.BLACK:
             currentPlayer = BoardStatus.WHITE
         else:
             currentPlayer = BoardStatus.BLACK
+        color = {BoardStatus.BLACK: 'black', BoardStatus.WHITE: 'white'}[currentPlayer]
         myCanvas.delete('current player')
-        myCanvas.create_oval(WINDOW_SIZE + SIDE_WIDTH/2 - 0.5 * STEP, WINDOW_SIZE/2 - 0.5 * STEP, WINDOW_SIZE + SIDE_WIDTH/2 + 0.5 * STEP, WINDOW_SIZE/2 + 0.5 * STEP,
-                             fill=color, tags='current player')
-
+        create_circle(WINDOW_SIZE + SIDE_WIDTH/2, WINDOW_SIZE/2, 0.5 * STEP, fill=color, tags='current player')
 
 def center_indices(x, y):
     index_x = int((x + 0.5 * STEP) // STEP)
@@ -66,8 +72,7 @@ def draw_next_piece(centerIndices):
     index_x = centerIndices[0]
     index_y = centerIndices[1]
     if board[index_x][index_y] == BoardStatus.EMPTY:
-        myCanvas.create_oval((index_x - 0.5) * STEP, (index_y - 0.5) * STEP, (index_x + 0.5) * STEP, (index_y + 0.5) * STEP,
-                             outline='blue', fill='', tags='hint')
+        create_circle(index_x * STEP, index_y * STEP, 0.5 * STEP, outline='blue', fill='', tags='hint')
 
 
 def show_next_piece(event):
@@ -85,7 +90,6 @@ myCanvas.bind('<Motion>', show_next_piece)
 myCanvas.bind('<Button-1>', add_piece)
 
 
-
-myCanvas.create_oval(WINDOW_SIZE + SIDE_WIDTH/2 - 0.5 * STEP, WINDOW_SIZE/2 - 0.5 * STEP, WINDOW_SIZE + SIDE_WIDTH/2 + 0.5 * STEP, WINDOW_SIZE/2 + 0.5 * STEP,
-                     fill='black', tags='current player')
+draw_board()
+create_circle(WINDOW_SIZE + SIDE_WIDTH/2, WINDOW_SIZE/2, 0.5 * STEP, fill='black', tags='current player')
 root.mainloop()
