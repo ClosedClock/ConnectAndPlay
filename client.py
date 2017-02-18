@@ -1,11 +1,7 @@
-import socket
-import tkinter as tk
-from queue import Queue
-import threading
 import logging
 
 import settings
-from connect_GUI import ConnectGUI
+from connect_GUI import ConnectGUI, ListenThread
 
 
 class ClientGUI(ConnectGUI):
@@ -15,49 +11,47 @@ class ClientGUI(ConnectGUI):
         # self.__sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # self.__sock.settimeout(0.3)
         # self.__sock.connect(addr)
-        self.__sock = sock
-        self.__queue = Queue()
+        self.__tServer = ListenThread(sock)
+        self.__tServer.start()
         self.__serverAddr = addr
-
-        self.__isConnecting = True
-
-        self.__clientThread = threading.Thread(target=self.receive_message)
-        self.__clientThread.start()
+        self.__connectedDict = {addr: {}}
         logging.info('A ClientGUI object created')
 
-    def receive_message(self):
-        emptyStrCounter = 0
-        sock = self.__sock
-        while self.__isConnecting and emptyStrCounter < 50:
-            try:
-                message = sock.recv(1024).decode('utf-8')
-                logging.info(r'Got message "%s"' % message)
-                if message == '':
-                    emptyStrCounter += 1
-                    continue
-                else:
-                    emptyStrCounter = 0
-                logging.info('Putting message %s into the queue' % message)
-            except socket.timeout:
-                continue
-            self.__queue.put(message)
-        sock.close()
-
     def check_message(self):
-        if not self.__isConnecting:
-            return
-        while not self.__queue.empty():
-            message = self.__queue.get(False)
+        # if not self.isConnecting():
+        #     return
+        while self.__tServer.has_message():
+            message = self.__tServer.get_message()
             logging.info('Got message from queue %s' % message)
-            self.deal_message(message)
+            serverIsGone = self.deal_message(message)
+            if serverIsGone:
+                pass
         self.after(100, self.check_message)
 
     def deal_message(self, message):
-        if message[0] == '\\':
-            logging.info('This is a command from: %s' % settings.get_addr_name(self.__serverAddr))
-            if message == r'\quit':
-                self.chatPanel.insert(tk.END, 'Chat room closed.\n')
-                self.__isConnecting = False
+        messageWords = message.split('\000')
+        try:
+            command = messageWords[0]
+            sender = self.str_to_addr(messageWords[1])
+            content = messageWords[2]
+        except IndexError:
+            logging.warning('Received message with wrong format: %s' % message)
+            return False
+
+        if command == 'quit':
+            self.print_to_chatPanel('Chat room closed.')
+            self.__tServer.quit()
+
+        elif command == 'add_member':
+            addr = self.str_to_addr(content)
+            self.__connectedDict[addr] = {}
+            self.add_member(addr)
+
+        elif command == 'say':
+            nickname = self.get_name_of_addr(sender)
+            self.print_to_chatPanel(content, nickname)
+
+        return False
 
             # messageWords = re.split(r'\s+', message)
             # if settings.gameThread != None:
@@ -78,29 +72,29 @@ class ClientGUI(ConnectGUI):
             #         return
             #     else:
             #         print('Received strange command: %s' % message)
-            pass
 
-        else:
-            nickname = settings.get_addr_name(self.__serverAddr)
-            self.chatPanel.insert(tk.END, nickname + ':> ' + message + '\n')
-
-    def say(self):
+    def say(self, event):
         '''
         目前发给服务器后就结束了, 以后需要用服务器广播到所有client
         :return:
         '''
-        if not self.__isConnecting:
-            self.chatPanel.insert(tk.END, 'Chat room closed.\n')
+        if not self.__tServer.isRunning():
+            self.print_to_chatPanel('Chat room closed.')
             return
-        message = self.messageInput.get()
-        self.messageInput.delete(0, tk.END)
-        if message != '':
-            self.chatPanel.insert(tk.END, settings.username + ':> ' + message + '\n')
-            self.__sock.send(message.encode('utf-8'))
+        content = self.get_input_content()
+        if content != '':
+            self.print_to_chatPanel(content, self.get_username())
+            self.__tServer.send_message('say' + '\000' + 'ALL' + '\000' + content)
+        return 'break'
+
+    def challenge_member(self):
+        pass
 
     def quit(self):
-        if self.__isConnecting:
-            self.__sock.send(br'\quit')
-            logging.info('Set the ClientGUI isConnecting flag to False')
-            self.__isConnecting = False
+        try:
+            self.__tServer.send_message('quit\000\000')
+        except OSError:
+            pass
+        self.__tServer.quit()
         super().quit()
+

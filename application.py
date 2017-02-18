@@ -17,16 +17,20 @@ class Application(tk.Tk):
     有工具栏, 用frame来实现, 目前只包含好友列表功能(支持修改)
     窗口应该包含创建聊天室和连接好友功能. 还可以一键查找上线好友
     '''
-    def __init__(self):
+    def __init__(self, username, friendList, file):
         super().__init__()
         self.isInChatroom = False
+        self.protocol('WM_DELETE_WINDOW', self.quit)
+        self.__username = username
+        self.__friendList = friendList
+        self.__file = file
         self.create_widgets()
 
     def create_widgets(self):
         menubar = tk.Menu(self)
 
         gameMenu = tk.Menu(menubar, tearoff=0)
-        gameMenu.add_command(label='Janken')
+        gameMenu.add_command(label='Janken', command=self.game_janken)
         # filemenu.add_separator()  #这样可以用线隔开
         menubar.add_cascade(label='Game', menu=gameMenu)
 
@@ -73,9 +77,9 @@ class Application(tk.Tk):
             sock.settimeout(0.3)
             sock.bind(('', settings.PORT))
             sock.listen(5)
-            serverToplevel = ServerGUI(self, sock)
+            self.serverToplevel = ServerGUI(self, sock)
             self.isInChatroom = True
-            serverToplevel.title('Chatroom - server')
+            self.serverToplevel.title('Chatroom - server')
         except:
             messagebox.showinfo('Warning', 'Cannot start a server. %d may be occupied.' % settings.PORT, icon='warning')
 
@@ -90,6 +94,19 @@ class Application(tk.Tk):
     def friend_list(self):
         friendListToplevel = FriendListToplevel(self)
         friendListToplevel.title('Friend List')
+
+    def get_username(self):
+        return self.__username
+
+    def set_username(self, username):
+        self.__username = username
+
+    def get_friendList(self):
+        return self.__friendList
+
+    def update_friendList(self, friendList):
+        self.__friendList = friendList
+        self.__file.write(json.dumps([self.__username, self.__friendList]))
 
     def about_connectAndPlay(self):
         aboutToplevel = tk.Toplevel(self)
@@ -107,6 +124,21 @@ class Application(tk.Tk):
         howText.insert(tk.END, 'Call handsome Zijin Shi and you will know how to use me')
         howText.config(state='disabled')
         howText.pack()
+
+    def game_janken(self):
+        pass
+
+    def quit(self):
+        try:
+            self.clientToplevel.quit()
+        except:
+            pass
+        try:
+            self.serverToplevel.quit()
+        except:
+            pass
+        self.destroy()
+
 
 
 
@@ -130,7 +162,7 @@ class ChooseServerToplevel(tk.Toplevel):
             return
 
         correspondIp = serverStr
-        for ip, nickname in settings.friendList.items():
+        for ip, nickname in self.master.get_friendList().items():
             if nickname == serverStr:
                 correspondIp = ip
                 break
@@ -140,18 +172,19 @@ class ChooseServerToplevel(tk.Toplevel):
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(0.3)
             sock.connect(addr)
-            clientToplevel = ClientGUI(self.master, sock, addr)
-            self.isInChatroom = True
-            clientToplevel.title('Chatroom - client')
+            self.master.clientToplevel = ClientGUI(self.master, sock, addr)
+            self.master.isInChatroom = True
+            self.master.clientToplevel.title('Chatroom - client')
         except:
             messagebox.showinfo('Warning', 'Cannot connect to %s' % serverStr, icon='warning')
         finally:
             self.destroy()
 
+
 class FriendListToplevel(tk.Toplevel):
     def __init__(self, master):
         super().__init__(master)
-        self.friendList = settings.friendList
+        self.friendList = master.get_friendList().copy()
         self.addButton = tk.Button(self, text='Add Friend', command=self.add_friend)
         self.addButton.pack()
         self.saveButton = tk.Button(self, text='Confirm', command=self.save_modification)
@@ -163,7 +196,7 @@ class FriendListToplevel(tk.Toplevel):
         self.table.destroy()
         self.table = tk.Frame(self)
         rowNum = 0
-        for ip, nickname in self.friendList.items():
+        for ip, nickname in sorted(self.friendList.items()):
             tk.Label(self.table, text='%s' % nickname).grid(row=rowNum, column=0)
             tk.Label(self.table, text='%s' % ip).grid(row=rowNum, column=1)
             # ipLabel[rowNum].grid(row=rowNum, column=1)
@@ -177,9 +210,7 @@ class FriendListToplevel(tk.Toplevel):
         self.refresh_table()
 
     def save_modification(self):
-        settings.friendList = self.friendList
-        with open(settings.filePath, 'w') as file:
-            file.write(json.dumps([settings.username, settings.friendList]))
+        self.master.update_friendList(self.friendList)
         self.destroy()
 
     def add_friend(self):

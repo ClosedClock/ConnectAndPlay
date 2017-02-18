@@ -1,53 +1,9 @@
 import socket
 import threading
 import logging
-import tkinter as tk
-from queue import Queue
 import settings
 
-from connect_GUI import ConnectGUI
-
-class ServerSlaveThread(threading.Thread):
-    def __init__(self, sock):
-        logging.info('Initializing a ServerSlaveThread object')
-        super().__init__()
-        self.__sock = sock
-        self.__queue = Queue()
-        self.__isRunning = True
-        logging.info('A ServerSlaveThread object created')
-
-    def run(self):
-        emptyStrCounter = 0
-        sock = self.__sock
-        while self.__isRunning and emptyStrCounter < 50:
-            try:
-                message = sock.recv(1024).decode('utf-8')
-                logging.info(r'Got message "%s"' % message)
-                if message == '':
-                    emptyStrCounter += 1
-                    continue
-                else:
-                    emptyStrCounter = 0
-                logging.info('Putting message %s into the queue' % message)
-            except socket.timeout:
-                continue
-            self.__queue.put(message)
-        sock.close()
-
-    def get_message(self):
-        return self.__queue.get(False)
-
-    def has_message(self):
-        return not self.__queue.empty()
-
-    def send_message(self, message):
-        self.__sock.send(message.encode('utf-8'))
-
-    def quit(self):
-        logging.info('Set the ServerSlaveThread isRunning flag to False')
-        # self.__sock.send(r'\quit'.encode('utf-8'))
-        self.__isRunning = False
-
+from connect_GUI import ConnectGUI, ListenThread
 
 
 class ServerGUI(ConnectGUI):
@@ -64,6 +20,7 @@ class ServerGUI(ConnectGUI):
         self.__clientsDict = {}
         #TODO: dict max length may be adjusted later
         self.__sock = sock
+        self.__addr = (socket.gethostbyname(socket.gethostname()), settings.PORT)
         # self.__sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # self.__sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         # self.__sock.settimeout(0.3)
@@ -85,11 +42,19 @@ class ServerGUI(ConnectGUI):
                 sock, addr = self.__sock.accept()
             except socket.timeout:
                 continue
-            tSlave = ServerSlaveThread(sock)
-            self.__clientsDict[addr] = tSlave
-            tSlave.start()
-            print('Accept new connection from %s...' % settings.get_addr_name(addr))
-        logging.info('tServer closed')
+
+            for existedAddr in self.__clientsDict:
+                self.__clientsDict[existedAddr].send_message('new_member' + '\000\000' + self.addr_to_str(addr))
+            self.add_member(addr)
+            self.__clientsDict[addr] = ListenThread(sock)
+            for existedAddr in self.__clientsDict:
+                if existedAddr != addr:
+                    self.__clientsDict[addr].send_message('new_member' + '\000\000' + self.addr_to_str(existedAddr))
+
+            self.__clientsDict[addr].start()
+            self.print_to_chatPanel('Accept new connection from %s...' % self.get_name_of_addr(addr))
+            print('Accept new connection from %s...' % self.get_name_of_addr(addr))
+        logging.info('Waiting thread closed')
         self.__sock.close()
 
 
@@ -111,20 +76,43 @@ class ServerGUI(ConnectGUI):
             del self.__clientsDict[addr]
         self.after(100, self.check_message)
 
-    def deal_message(self, addr, message):
+    def deal_message(self, sender, message):
         '''
         处理消息, 根据addr的不同会有不同的处理
-        :param addr: 消息发送方的地址
+        :param sender: 消息发送方的地址
         :param message: 消息
         :return:
         '''
-        if message[0] == '\\':
-            logging.info('This is a command from: %s' % settings.get_addr_name(addr))
-            if message == r'\quit':
-                nickname = settings.get_addr_name(addr)
-                self.chatPanel.insert(tk.END, nickname + ' left chat room\n')
-                self.__clientsDict[addr].quit()
-                return True
+        messageWords = message.split('\000')
+        try:
+            command = messageWords[0]
+            target = self.str_to_addr(messageWords[1])
+            content = messageWords[2]
+        except IndexError:
+            logging.warning('Received message with wrong format: %s' % message)
+            return False
+
+        if command == 'quit':
+            logging.info(str(sender) + ' sent a quit message')
+            nickname = self.get_name_of_addr(sender)
+            self.print_to_chatPanel(nickname + ' left chat room')
+            self.__clientsDict[sender].quit()
+            return True
+
+        elif command == 'say':
+            if target == 'ALL':
+                nickname = self.get_name_of_addr(sender)
+                self.print_to_chatPanel(content, nickname)
+                transitMessage = 'say' + '\000' + self.addr_to_str(sender) + '\000' + content
+                for addr in self.__clientsDict:
+                    if addr == sender:
+                        continue
+                    logging.info('Try to send message %s to %s' % (transitMessage, addr))
+                    self.__clientsDict[addr].send_message(transitMessage)
+            else:
+                logging.warning('Target of say is not ALL!')
+                return False
+
             # messageWords = re.split(r'\s+', message)
             # if settings.gameThread != None:
             #     if message == r'\gameover':
@@ -144,39 +132,43 @@ class ServerGUI(ConnectGUI):
             #         return
             #     else:
             #         print('Received strange command: %s' % message)
-            pass
-
-        else:
-            nickname = settings.get_addr_name(addr)
-            self.chatPanel.insert(tk.END, nickname + ':> ' + message + '\n')
 
         return False
 
 
-    def say(self):
+    def say(self, event):
         '''
         从输入框读取消息然后发送到全体成员
         :return:
         '''
-        message = self.messageInput.get()
-        self.messageInput.delete(0,tk.END)
-        if message != '':
-            self.chatPanel.insert(tk.END, settings.username + ':> ' + message + '\n')
+        content = self.get_input_content()
+        if content != '':
+            self.print_to_chatPanel(content, self.get_username())
             for addr in self.__clientsDict:
-                logging.info('Try to send message %s to %s' % (message, addr[0]))
-                self.__clientsDict[addr].send_message(message)
+                logging.info('Try to send message %s to %s' % (content, addr[0]))
+                self.__clientsDict[addr].send_message('say' + '\000' + self.addr_to_str(self.__addr) + '\000' + content)
+        return 'break'
+
+
+    def challenge_member(self):
+        pass
+
 
     def quit(self):
         '''
         重载了关闭按钮的函数, 会发送给所有client退出命令
         :return:
         '''
-        for clientThread in self.__clientsDict.values():
-            clientThread.send_message(r'\quit')
-            clientThread.quit()
+        try:
+            for clientThread in self.__clientsDict.values():
+                try:
+                    clientThread.send_message('quit\000\000')
+                except OSError:
+                    pass
+                clientThread.quit()
+        except AttributeError:
+            pass
         super().quit()
-
-
 
     def get_clients_addr(self):
         return self.__clientsDict.keys()
@@ -198,6 +190,3 @@ class ServerGUI(ConnectGUI):
                     return self.__clientsDict[addr]
             raise KeyError('Address not in clientDict when get_slave_thread')
 
-
-    # def get_clients_num(self):
-    #     return len(self.__clientsDict)
