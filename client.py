@@ -2,19 +2,23 @@ import logging
 
 import settings
 from connect_GUI import ConnectGUI, ListenThread
+from tkinter import messagebox
 
 
 class ClientGUI(ConnectGUI):
     def __init__(self, master, sock, addr):
         logging.info('Initializing a ClientGUI object')
         super().__init__(master)
-        # self.__sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # self.__sock.settimeout(0.3)
-        # self.__sock.connect(addr)
+        self.isServer = False
+        self.__gameDict = {addr: {}}
+        self.serverAddr = addr
+        print('serverAddr is\n')
+        print(self.serverAddr)
+
         self.__tServer = ListenThread(sock)
         self.__tServer.start()
-        self.__serverAddr = addr
-        self.__connectedDict = {addr: {}}
+        self.send_message('hello', 'SERVER', self.get_username())
+        self.after(100, self.check_message)
         logging.info('A ClientGUI object created')
 
     def check_message(self):
@@ -32,24 +36,88 @@ class ClientGUI(ConnectGUI):
         messageWords = message.split('\000')
         try:
             command = messageWords[0]
+            logging.info('command is %s' % command)
             sender = self.str_to_addr(messageWords[1])
+            logging.info('sender is %s' % messageWords[1])
             content = messageWords[2]
+            logging.info('content is %s' % content)
         except IndexError:
             logging.warning('Received message with wrong format: %s' % message)
             return False
 
         if command == 'quit':
+            self.delete_all_members()
             self.print_to_chatPanel('Chat room closed.')
             self.__tServer.quit()
+            return True
 
-        elif command == 'add_member':
-            addr = self.str_to_addr(content)
-            self.__connectedDict[addr] = {}
-            self.add_member(addr)
+        elif command == 'hello':
+            logging.info('Received hello message from %s' % content)
+            herUsername = content
+            self.update_member_with_username(herUsername, self.serverAddr)
+            self.add_member('SERVER')
+
+        elif command == 'existed_member' or command == 'new_member':
+            logging.info('Adding new member. Address: %s, username: %s' % (sender, content))
+            herUsername = content
+            self.update_member_with_username(herUsername, sender)
+            self.add_member(sender)
+            if command == 'new_member':
+                nickname = self.memberNameDict[sender]
+                self.print_to_chatPanel(nickname + ' entered chat room')
+
+        elif command == 'member_leave':
+            nickname = self.memberNameDict[sender]
+            logging.info('Member %s left' % nickname)
+            self.delete_member(sender)
+            self.print_to_chatPanel(nickname + ' left chat room')
 
         elif command == 'say':
-            nickname = self.get_name_of_addr(sender)
+            nickname = self.memberNameDict[sender]
             self.print_to_chatPanel(content, nickname)
+
+        elif command == 'challenge':
+            nickname = self.memberNameDict[sender]
+            gameInfo = content.split()
+            gameName = gameInfo[0]
+            if self.has_game_with(sender, gameName):
+                logging.warning('Got challenged by a person with existed game!')
+                return
+            rounds = int(gameInfo[1])
+            answer = messagebox.askquestion('Here comes a new challenger!',
+                                            '%s wants to play %s for %d rounds with you. Do you want to accept?'
+                                            % (nickname, gameName, rounds), icon='info')
+            if answer == 'yes':
+                # if self.has_game_with(sender, gameName):
+                #     logging.warning('Got challenged by a person with existed game!')
+                #     return
+                self.send_message('reply_challenge', sender, 'yes')
+                newGame = settings.gameDict[gameName].function(self, sender, *gameInfo[1:])
+                self.add_game_with(sender, gameName, newGame)
+            else:
+                self.send_message('reply_challenge', sender, 'no')
+
+        elif command == 'reply_challenge':
+            if content == 'no':
+                pass
+                return
+            if content == 'yes':
+                gameInfo = content.split()
+                gameName = gameInfo[0]
+                newGame = settings.gameDict[gameName].function(*gameInfo[1:])
+                self.add_game_with(sender, gameName, newGame)
+
+        elif command == 'game_over':
+            self.game_with(sender, content).received_info('game_over')
+            self.delete_game_with(sender, content)
+
+        elif command == 'game':
+            gameInfo = content.split()
+            gameName = gameInfo[0]
+            if not self.has_game_with(sender, gameName):
+                logging.warning('Got game message with no game being played!')
+                return
+            self.game_with(sender, gameName).received_info(*gameInfo[1:])
 
         return False
 
@@ -83,16 +151,16 @@ class ClientGUI(ConnectGUI):
             return
         content = self.get_input_content()
         if content != '':
-            self.print_to_chatPanel(content, self.get_username())
-            self.__tServer.send_message('say' + '\000' + 'ALL' + '\000' + content)
+            self.print_to_chatPanel(content, self.memberNameDict['MYSELF'])
+            self.send_message('say', 'ALL', content)
         return 'break'
 
-    def challenge_member(self):
-        pass
+    def get_listen_thread(self):
+        return self.__tServer
 
     def quit(self):
         try:
-            self.__tServer.send_message('quit\000\000')
+            self.send_message('quit', 'SERVER', '')
         except OSError:
             pass
         self.__tServer.quit()

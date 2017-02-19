@@ -1,58 +1,47 @@
 import settings
 import queue
 import logging
+import tkinter as tk
 
 
-class Game(object):
-    def __init__(self, isChallenger, *args):
-        self.__isChallenger = isChallenger
-        if isChallenger:
-            if len(args) == 0:
-                ip = None
-            elif len(args) == 1:
-                ip = args[0]
-            else:
-                raise SyntaxError
-            self.__thread = settings.get_connect_thread(ip)
-            settings.gameThread = self.__thread
-        else:
-            self.__thread = settings.gameThread
-        self.__nickname = self.__thread.get_nickname()
-        self.__isRunning = True
-        self.__username = settings.username
+class Game(tk.Toplevel):
+    def __init__(self, master, rivalAddr):
+        super().__init__(master)
+        self.__myName = self.master.get_username()
+        self.__rivalName = self.master.memberNameDict[rivalAddr]
+        self.__rivalAddr = rivalAddr
+        self.__isServer = self.master.isServer
+        self.protocol('WM_DELETE_WINDOW', self.quit)
+        pass
 
-    def invite(self, message):
-        self.send_message(message)
-        try:
-            reply = self.get_message(10)
-        except queue.Empty:
-            print('No response')
-            self.__isRunning = False
-            return
-        logging.info('Reply is \"%r\"' % reply)
-        if reply == r'\yes':
-            print('Requist accepted. Game start!')
-        else:
-            print('Requist refused')
-            self.__isRunning = False
+    @property
+    def myName(self):
+        return self.__myName
 
-    def send_message(self, message):
-        self.__thread.send_message(message)
+    @property
+    def rivalName(self):
+        return self.__rivalName
 
-    def get_message(self, timeout=None):
-        return self.__thread.get_message(timeout)
+    @property
+    def isServer(self):
+        return self.__isServer
 
-    def nickname(self):
-        return self.__nickname
+    def send_info(self, info):
+        self.master.send_message('game', self.__rivalAddr, self.__class__.__name__ + ' ' + info)
 
-    def username(self):
-        return self.__username
+    def received_info(self, *gameInfo):
+        logging.warning('received_info has not been implemented!')
 
-    def isChallenger(self):
-        return self.__isChallenger
+    def quit(self):
+        self.master.send_message('game_over', self.__rivalAddr, self.__class__.__name__)
+        self.destroy()
 
-    def isRunning(self):
-        return self.__isRunning
 
-    def game_over(self):
-        self.send_message('\gameover')
+class TurnBasedGame(Game):
+    def __init__(self, master, rivalAddr):
+        super().__init__(master, rivalAddr)
+        self.turnIsDecided = False
+        self.isMyTurn = False
+
+    def turn_over(self):
+        logging.warning('turn_over has not been implemented!')

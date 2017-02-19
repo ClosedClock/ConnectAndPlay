@@ -2,7 +2,6 @@ import json, os
 import tkinter as tk
 from tkinter import messagebox
 from application import Application
-import settings
 
 # # 没有用了
 # def deal_commands():

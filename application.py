@@ -57,7 +57,7 @@ class Application(tk.Tk):
 
     def start_server(self):
         if self.isInChatroom:
-            messagebox.showinfo('Warning', 'Currently you can only have one chatroom', icon='warning')
+            messagebox.showwarning('Warning', 'Currently you can only have one chatroom')
             return
         # TODO: 改变了PORT客户端就无法连接, 需要解决
         # for i in range(10):
@@ -81,12 +81,12 @@ class Application(tk.Tk):
             self.isInChatroom = True
             self.serverToplevel.title('Chatroom - server')
         except:
-            messagebox.showinfo('Warning', 'Cannot start a server. %d may be occupied.' % settings.PORT, icon='warning')
+            messagebox.showwarning('Warning', 'Cannot start a server. %d may be occupied.' % settings.PORT)
 
 
     def connect_somebody(self):
         if self.isInChatroom:
-            messagebox.showinfo('Warning', 'Currently you can only have one chatroom', icon='warning')
+            messagebox.showwarning('Warning', 'Currently you can only have one chatroom')
             return
         chooseServerToplevel = ChooseServerToplevel(self)
         chooseServerToplevel.title('Build connection')
@@ -102,11 +102,14 @@ class Application(tk.Tk):
         self.__username = username
 
     def get_friendList(self):
-        return self.__friendList
+        return self.__friendList.copy()
 
     def update_friendList(self, friendList):
         self.__friendList = friendList
-        self.__file.write(json.dumps([self.__username, self.__friendList]))
+        open(self.__file.name, 'w').write(json.dumps([self.__username, self.__friendList]))
+
+    def add_to_friendList(self, herUsername, ip):
+        self.__friendList[ip] = herUsername
 
     def about_connectAndPlay(self):
         aboutToplevel = tk.Toplevel(self)
@@ -176,7 +179,7 @@ class ChooseServerToplevel(tk.Toplevel):
             self.master.isInChatroom = True
             self.master.clientToplevel.title('Chatroom - client')
         except:
-            messagebox.showinfo('Warning', 'Cannot connect to %s' % serverStr, icon='warning')
+            messagebox.showwarning('Warning', 'Cannot connect to %s' % serverStr)
         finally:
             self.destroy()
 
@@ -184,7 +187,7 @@ class ChooseServerToplevel(tk.Toplevel):
 class FriendListToplevel(tk.Toplevel):
     def __init__(self, master):
         super().__init__(master)
-        self.friendList = master.get_friendList().copy()
+        self.friendList = master.get_friendList()
         self.addButton = tk.Button(self, text='Add Friend', command=self.add_friend)
         self.addButton.pack()
         self.saveButton = tk.Button(self, text='Confirm', command=self.save_modification)
@@ -197,8 +200,8 @@ class FriendListToplevel(tk.Toplevel):
         self.table = tk.Frame(self)
         rowNum = 0
         for ip, nickname in sorted(self.friendList.items()):
-            tk.Label(self.table, text='%s' % nickname).grid(row=rowNum, column=0)
-            tk.Label(self.table, text='%s' % ip).grid(row=rowNum, column=1)
+            tk.Label(self.table, text='%s' % nickname).grid(row=rowNum, column=0, sticky='W')
+            tk.Label(self.table, text='%s' % ip).grid(row=rowNum, column=1, sticky='W')
             # ipLabel[rowNum].grid(row=rowNum, column=1)
             tk.Button(self.table, text='Delete', command=partial(self.delete_friend, ip)).grid(row=rowNum, column=2)
             rowNum += 1
@@ -227,12 +230,14 @@ class FriendListToplevel(tk.Toplevel):
         def add_friend_confirm():
             ip = ipEntry.get()
             if ip == '':
-                messagebox.showinfo('Warning', 'Please enter ip address', icon='warning')
+                messagebox.showwarning('Warning', 'Please enter ip address')
                 return
             nickname = nicknameEntry.get()
             if nickname == '':
-                nickname = None
-            self.add_friend_check(nickname, ip)
+                messagebox.showwarning('Warning', 'Please enter nickname')
+                return
+            if not self.add_friend_check(nickname, ip):
+                return
             addFriendToplevel.destroy()
             self.refresh_table()
         addButton = tk.Button(addFriendToplevel, text='Add', command=add_friend_confirm)
@@ -240,20 +245,37 @@ class FriendListToplevel(tk.Toplevel):
 
     def add_friend_check(self, nickname, ip):
         if not re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', ip):
-            messagebox.showinfo('Error', 'Invalid IPv4 format', icon='error')
-            return
-        if (ip in self.friendList) and (self.friendList[ip] != None):
-            if (nickname == self.friendList[ip]) or (nickname == None):
-                return
-            answer = messagebox.askquestion('Warning', 'IP already exists. Do you want to change the nickname from \"%s\" to \"%s\"?'
-                                            % (self.friendList[ip], nickname), icon='warning')
+            messagebox.showwarning('Warning', 'Invalid IPv4 format')
+            return False
+        if nickname in self.friendList.values():
+            messagebox.showwarning('Warning', 'Nicknames cannot repeat!')
+            return False
+        if ip in self.friendList:
+            if nickname == self.friendList[ip]:
+                return True
+            answer = messagebox.askquestion('Confirm', 'IP already exists. Do you want to change the nickname from \"%s\" to \"%s\"?'
+                                            % (self.friendList[ip], nickname), icon='info')
             if answer == 'yes':
-                if nickname in self.friendList.values():
-                    messagebox.showinfo('Warning', 'Warning: nicknames repeated', icon='warning')
                 self.friendList[ip] = nickname
+                return True
             else:
-                return
-        else:
-            if (nickname in self.friendList.values()) and (nickname != None):
-                messagebox.showinfo('Warning', 'Warning: nicknames repeated', icon='warning')
-            self.friendList[ip] = nickname
+                return False
+
+        self.friendList[ip] = nickname
+        return True
+
+        # if (ip in self.friendList) and (self.friendList[ip] != None):
+        #     if (nickname == self.friendList[ip]) or (nickname == None):
+        #         return
+        #     answer = messagebox.askquestion('Warning', 'IP already exists. Do you want to change the nickname from \"%s\" to \"%s\"?'
+        #                                     % (self.friendList[ip], nickname), icon='warning')
+        #     if answer == 'yes':
+        #         if nickname in self.friendList.values():
+        #             messagebox.showinfo('Warning', 'Warning: nicknames repeated', icon='warning')
+        #         self.friendList[ip] = nickname
+        #     else:
+        #         return
+        # else:
+        #     if (nickname in self.friendList.values()) and (nickname != None):
+        #         messagebox.showinfo('Warning', 'Warning: nicknames repeated', icon='warning')
+        #     self.friendList[ip] = nickname
