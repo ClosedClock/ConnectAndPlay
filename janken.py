@@ -20,11 +20,14 @@ class GameResult(Enum):
 class Janken(Game):
     def __init__(self, master, rivalAddr, rounds):
         super().__init__(master, rivalAddr)
+        if self.isServer:
+            self.title('Janken - server')
+        else:
+            self.title('Janken - client')
         self.__rounds = int(rounds)
         self.__currentRound = 1
         self.__resultList = []
-        self.__rivalGesture = tk.IntVar()
-        self.__rivalGesture.set(-1)
+        self.__rivalGesture = -1
         self.__myGesture = -1
         self.create_widgets()
 
@@ -46,20 +49,24 @@ class Janken(Game):
         self.infoLabel.grid(row=1, column=0, columnspan=3)
         self.rockButton = tk.Button(self.chooseFrame, text='Rock', command=lambda: self.do_gesture(0))
         self.rockButton.grid(row=2, column=0)
-        self.rockButton = tk.Button(self.chooseFrame, text='Scissors', command=lambda: self.do_gesture(1))
-        self.rockButton.grid(row=2, column=0)
-        self.rockButton = tk.Button(self.chooseFrame, text='Paper', command=lambda: self.do_gesture(2))
-        self.rockButton.grid(row=2, column=0)
+        self.scissorsButton = tk.Button(self.chooseFrame, text='Scissors', command=lambda: self.do_gesture(1))
+        self.scissorsButton.grid(row=2, column=1)
+        self.paperButton = tk.Button(self.chooseFrame, text='Paper', command=lambda: self.do_gesture(2))
+        self.paperButton.grid(row=2, column=2)
         self.chooseFrame.pack()
 
     def do_gesture(self, gestureNumber):
         self.__myGesture = gestureNumber
-        self.send_info(str(gestureNumber))
         self.chooseFrame.pack_forget()
-        if self.__rivalGesture == -1:
-            self.waitingLabel.pack()
+        if self.isServer:
+            if self.__rivalGesture == -1:
+                self.waitingLabel.pack()
+            else:
+                self.send_info(str(self.__myGesture))
+                self.show_round_result()
         else:
-            self.show_round_result()
+            self.send_info(str(gestureNumber))
+            self.waitingLabel.pack()
 
     # def play(self):
     #     if not self.isRunning():
@@ -80,8 +87,8 @@ class Janken(Game):
                 winNum += 1
             elif result == GameResult.LOSE:
                 loseNum += 1
-        tk.Label(text='Win: %d, Lose: %d, Draw: %d' % (winNum, loseNum, self.__rounds - winNum - loseNum)).pack()
-        tk.Label(text='Confirm', command=self.quit).pack()
+        tk.Label(self, text='Win: %d, Lose: %d, Draw: %d' % (winNum, loseNum, self.__rounds - winNum - loseNum)).pack()
+        tk.Button(self, text='Confirm', command=self.quit).pack()
 
     #
     # def one_round(self):
@@ -94,20 +101,29 @@ class Janken(Game):
     #     result = self.round_result(myGesture, opponentGesture)
     #     self.__resultList.append(result)
 
+    def deal_info(self, *infoList):
+        if self.isServer:
+            self.__rivalGesture = int(infoList[0])
+            if self.__myGesture != -1:
+                self.send_info(str(self.__myGesture))
+                self.show_round_result()
+        else:
+            self.__rivalGesture = int(infoList[0])
+            self.show_round_result()
 
-    def received_info(self, rivalGesture):
-        self.__rivalGesture = rivalGesture
+    # def received_info(self, rivalGesture):
+    #     self.__rivalGesture = rivalGesture
 
-    def received_rival_gesture(self):
-        if self.__myGesture != -1:
-            self.waitingLabel.pack_forget()
-            self.next_turn()
+    # def received_rival_gesture(self):
+    #     if self.__myGesture != -1:
+    #         self.waitingLabel.pack_forget()
+    #         self.next_turn()
 
     def show_round_result(self):
         myGesture = self.__myGesture
         self.__myGesture = -1
-        rivalGesture = self.__rivalGesture.get()
-        self.__rivalGesture.set(-1)
+        rivalGesture = self.__rivalGesture
+        self.__rivalGesture = -1
         result = GameResult((myGesture - rivalGesture) % 3)
         self.__resultList.append(result)
         gestureDisplayDict = {0: 'Rock', 1: 'Scissors', 2: 'Paper'}
@@ -128,6 +144,6 @@ class Janken(Game):
         if self.__currentRound > self.__rounds:
             self.show_result()
             return
-        self.infoLabel.config(text='This is round %d' % self.__currentRound)
+        self.roundLabel.config(text='This is round %d' % self.__currentRound)
         self.chooseFrame.pack()
 

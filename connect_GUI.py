@@ -99,8 +99,8 @@ class ChatGUI(tk.Toplevel):
         return (name, addr)
 
     def delete_all_members(self):
-        self.memberAddrDict = {}
-        self.memberNameDict = {}
+        self.memberAddrDict.clear()
+        self.memberNameDict.clear()
         self.memberListbox.delete(0, tk.END)
 
 
@@ -133,6 +133,7 @@ class ConnectGUI(ChatGUI):
             self.master.add_to_friendList(herUsername, ip)
 
     def send_message(self, command, target, content, sender=None):
+        # TODO: 目前会调用ListenThread类,但是其实用sock就行了, 以后改
         if type(command) is not str:
             logging.warning('Wrong format in send_message!')
             return
@@ -191,9 +192,11 @@ class ConnectGUI(ChatGUI):
 
 
 class ListenThread(threading.Thread):
-    def __init__(self, sock):
+    def __init__(self, master, sock, addr):
         logging.info('Initializing a ListenThread object')
         super().__init__()
+        self.master = master
+        self.__addr = addr
         self.__sock = sock
         self.__queue = Queue()
         self.__isRunning = True
@@ -216,7 +219,8 @@ class ListenThread(threading.Thread):
             for oneMessage in messages:
                 if oneMessage != '':
                     logging.info('ListenThread is putting oneMessage %s into the queue' % oneMessage)
-                    self.__queue.put(oneMessage)
+                    # self.__queue.put(oneMessage)
+                    self.master.deal_message(self.__addr, oneMessage)
         self.__sock.close()
         logging.info('ListenThread closed')
 

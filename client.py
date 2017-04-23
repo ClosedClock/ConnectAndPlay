@@ -15,12 +15,13 @@ class ClientGUI(ConnectGUI):
         print('serverAddr is\n')
         print(self.serverAddr)
 
-        self.__tServer = ListenThread(sock)
+        self.__tServer = ListenThread(self, sock, 'SERVER')
         self.__tServer.start()
         self.send_message('hello', 'SERVER', self.get_username())
-        self.after(100, self.check_message)
+        # self.after(100, self.check_message)
         logging.info('A ClientGUI object created')
 
+    # 这个函数暂时不使用,改为用ListenThread来直接调用deal_message
     def check_message(self):
         # if not self.isConnecting():
         #     return
@@ -32,7 +33,8 @@ class ClientGUI(ConnectGUI):
                 pass
         self.after(100, self.check_message)
 
-    def deal_message(self, message):
+    def deal_message(self, SERVER, message):
+        # 这里SERVER的值肯定是'SERVER', 只是为了统一和server的格式
         messageWords = message.split('\000')
         try:
             command = messageWords[0]
@@ -91,7 +93,7 @@ class ClientGUI(ConnectGUI):
                 # if self.has_game_with(sender, gameName):
                 #     logging.warning('Got challenged by a person with existed game!')
                 #     return
-                self.send_message('reply_challenge', sender, 'yes')
+                self.send_message('reply_challenge', sender, content)
                 newGame = settings.gameDict[gameName].function(self, sender, *gameInfo[1:])
                 self.add_game_with(sender, gameName, newGame)
             else:
@@ -101,15 +103,18 @@ class ClientGUI(ConnectGUI):
             if content == 'no':
                 pass
                 return
-            if content == 'yes':
+            else:
                 gameInfo = content.split()
                 gameName = gameInfo[0]
-                newGame = settings.gameDict[gameName].function(*gameInfo[1:])
+                newGame = settings.gameDict[gameName].function(self, sender, *gameInfo[1:])
                 self.add_game_with(sender, gameName, newGame)
 
         elif command == 'game_over':
-            self.game_with(sender, content).received_info('game_over')
-            self.delete_game_with(sender, content)
+            try:
+                self.game_with(sender, content).quit()
+            except:
+                pass
+            # self.delete_game_with(sender, content)
 
         elif command == 'game':
             gameInfo = content.split()
@@ -117,7 +122,9 @@ class ClientGUI(ConnectGUI):
             if not self.has_game_with(sender, gameName):
                 logging.warning('Got game message with no game being played!')
                 return
-            self.game_with(sender, gameName).received_info(*gameInfo[1:])
+            # self.game_with(sender, gameName).received_info(*gameInfo[1:])
+            logging.info('Putting gameInfo %s into infoQueue' % gameInfo[1:])
+            self.game_with(sender, gameName).infoQueue.put(gameInfo[1:])
 
         return False
 

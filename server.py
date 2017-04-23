@@ -24,7 +24,7 @@ class ServerGUI(ConnectGUI):
         # self.__addr = (socket.gethostbyname(socket.gethostname()), settings.PORT)
         self.__serverThread = threading.Thread(target=self.waiting)
         self.__serverThread.start()
-        self.after(100, self.check_message)
+        # self.after(100, self.check_message)
         logging.info('A ServerGUI object created')
 
     def waiting(self):
@@ -39,7 +39,7 @@ class ServerGUI(ConnectGUI):
             except socket.timeout:
                 continue
 
-            self.__connectDict[addr] = ListenThread(sock)
+            self.__connectDict[addr] = ListenThread(self, sock, addr)
             self.send_message('hello', addr, self.get_username())
             for existedAddr in self.__connectDict:
                 if existedAddr != addr:
@@ -50,7 +50,7 @@ class ServerGUI(ConnectGUI):
         self.__sock.close()
         logging.info('Waiting thread closed')
 
-
+    # 这个函数暂时不使用,改为用ListenThread来直接调用deal_message
     def check_message(self):
         '''
         检查每个slave thread有没有收到消息, 处理消息(如果很耗时比如游戏就应该再建立一个线程)
@@ -79,8 +79,11 @@ class ServerGUI(ConnectGUI):
         messageWords = message.split('\000')
         try:
             command = messageWords[0]
+            logging.info('command is %s' % command)
             target = self.str_to_addr(messageWords[1])
+            logging.info('target is %s' % messageWords[1])
             content = messageWords[2]
+            logging.info('content is %s' % content)
         except IndexError:
             logging.warning('Received message with wrong format: %s' % message)
             return False
@@ -140,7 +143,7 @@ class ServerGUI(ConnectGUI):
                 # if self.has_game_with(sender, gameName):
                 #     logging.warning('Got challenged by a person with existed game!')
                 #     return
-                self.send_message('reply_challenge', sender, gameInfo)
+                self.send_message('reply_challenge', sender, content)
                 newGame = settings.gameDict[gameName].function(self, sender, *gameInfo[1:])
                 self.add_game_with(sender, gameName, newGame)
             else:
@@ -150,15 +153,20 @@ class ServerGUI(ConnectGUI):
             if content == 'no':
                 pass
                 return
-            if content == 'yes':
+            else:
                 gameInfo = content.split()
                 gameName = gameInfo[0]
-                newGame = settings.gameDict[gameName].function(*gameInfo[1:])
+                newGame = settings.gameDict[gameName].function(self, sender, *gameInfo[1:])
                 self.add_game_with(sender, gameName, newGame)
 
         elif command == 'game_over':
-            self.game_with(sender, content).received_info('game_over')
-            self.delete_game_with(sender, content)
+            # TODO: 如果一个人关了另一个人无法欣赏结果. 如果改成另一个人不关, 可能会因为
+            # TODO: 一边记录着有游戏,一边没有而造成bug (但似乎没有问题)
+            try:
+                self.game_with(sender, content).quit()
+            except:
+                pass
+            # self.delete_game_with(sender, content)
 
         elif command == 'game':
             gameInfo = content.split()
@@ -166,7 +174,9 @@ class ServerGUI(ConnectGUI):
             if not self.has_game_with(sender, gameName):
                 logging.warning('Got game message with no game being played!')
                 return
-            self.game_with(sender, gameName).received_info(*gameInfo[1:])
+            # self.game_with(sender, gameName).received_info(*gameInfo[1:])
+            logging.info('Putting gameInfo %s into infoQueue' % gameInfo[1:])
+            self.game_with(sender, gameName).infoQueue.put(gameInfo[1:])
 
             # messageWords = re.split(r'\s+', message)
             # if settings.gameThread != None:

@@ -2,6 +2,31 @@ import settings
 import queue
 import logging
 import tkinter as tk
+import threading
+from queue import Queue
+
+class GameHelperThread(threading.Thread):
+    def __init__(self, master, queue):
+        logging.info('Initializing a GameHelperThread object')
+        super().__init__()
+        self.master = master
+        self.__queue = queue
+        self.__isRunning = True
+        logging.info('A GameHelperThread object created')
+
+    def run(self):
+        while self.__isRunning:
+            try:
+                infoList = self.__queue.get(timeout=0.3)
+            except queue.Empty:
+                continue
+            logging.info('GameHelperThread got an info %s' % infoList)
+            self.master.deal_info(*infoList)
+        logging.info('GameHelperThread closed')
+
+    def quit(self):
+        logging.info('Set the GameHelperThread isRunning flag to False')
+        self.__isRunning = False
 
 
 class Game(tk.Toplevel):
@@ -11,6 +36,9 @@ class Game(tk.Toplevel):
         self.__rivalName = self.master.memberNameDict[rivalAddr]
         self.__rivalAddr = rivalAddr
         self.__isServer = self.master.isServer
+        self.infoQueue = Queue()
+        self.gameHelper = GameHelperThread(self, self.infoQueue)
+        self.gameHelper.start()
         self.protocol('WM_DELETE_WINDOW', self.quit)
         pass
 
@@ -29,11 +57,13 @@ class Game(tk.Toplevel):
     def send_info(self, info):
         self.master.send_message('game', self.__rivalAddr, self.__class__.__name__ + ' ' + info)
 
-    def received_info(self, *gameInfo):
+    def deal_info(self, *infoList):
         logging.warning('received_info has not been implemented!')
 
     def quit(self):
         self.master.send_message('game_over', self.__rivalAddr, self.__class__.__name__)
+        self.gameHelper.quit()
+        self.master.delete_game_with(self.__rivalAddr, self.__class__.__name__)
         self.destroy()
 
 
